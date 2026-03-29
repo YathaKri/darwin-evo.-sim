@@ -7,7 +7,11 @@
             "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
             "args": [
                 "-g",
-                "${file}",
+                "main.cpp",
+                "Simulation.cpp",
+                "Creature.cpp",
+                "Food.cpp",
+                "UI.cpp",
                 "-o",
                 "${fileDirname}\\Evolution.exe",
                 "-I", "C:\\msys64\\ucrt64\\include",
@@ -19,9 +23,7 @@
             "options": {
                 "cwd": "${fileDirname}"
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": ["$gcc"],
             "group": {
                 "kind": "build",
                 "isDefault": true
