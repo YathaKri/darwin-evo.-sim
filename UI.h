@@ -1,21 +1,24 @@
 #pragma once
-#include <SFML/Graphics.hpp>
+#include "raylib.h"
 #include "Simulation.h"
+#include <vector>
 
 class UI {
 public:
+    static constexpr int   PANEL_X     = 860;
+    static constexpr int   PANEL_W     = 180;
+    static constexpr int   SCREEN_H    = 640;
+
     UI();
 
-    void draw(sf::RenderWindow& window, const SimStats& stats);
+    void update(const SimStats& stats);  // call once per frame to record history
+    void draw(const SimStats& stats) const;
 
 private:
-    sf::Font m_font;
-    bool     m_fontLoaded = false;
+    std::vector<int> m_popHistory;       // rolling population history for graph
+    static constexpr int HISTORY_LEN = 120;
 
-    sf::RectangleShape m_panel;
-    sf::RectangleShape m_divider;
-
-    sf::Text makeLabel(const std::string& str, float x, float y, unsigned size = 16);
-    void     drawStat(sf::RenderWindow& window, const std::string& label,
-                      const std::string& value, float x, float& y);
+    void drawStatBlock(const char* label, const char* value, int x, int& y) const;
+    void drawBar(float value, float maxVal, Color barColor, int x, int y, int w) const;
+    void drawGraph(int x, int y, int w, int h) const;
 };

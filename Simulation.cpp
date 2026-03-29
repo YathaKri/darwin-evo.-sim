@@ -3,31 +3,35 @@
 #include <algorithm>
 
 Simulation::Simulation() : m_gen(std::random_device{}()) {
-    std::uniform_real_distribution<float> posDist(50.f, 750.f);
+    std::uniform_real_distribution<float> posX(50.f, WORLD_W - 50.f);
+    std::uniform_real_distribution<float> posY(50.f, WORLD_H - 50.f);
     std::uniform_real_distribution<float> velDist(-3.f, 3.f);
     std::uniform_int_distribution<int>    colorDist(50, 255);
     std::uniform_real_distribution<float> sizeDist(4.f, 10.f);
 
-    // Spawn initial population
     for (int i = 0; i < 30; i++) {
         Creature c;
-        c.shape.setRadius(sizeDist(m_gen));
-        c.shape.setFillColor(sf::Color(colorDist(m_gen), colorDist(m_gen), colorDist(m_gen)));
-        c.shape.setPosition({posDist(m_gen), posDist(m_gen)});
+        c.position = {posX(m_gen), posY(m_gen)};
         c.velocity = {velDist(m_gen), velDist(m_gen)};
+        c.radius   = sizeDist(m_gen);
+        c.color    = {
+            (unsigned char)colorDist(m_gen),
+            (unsigned char)colorDist(m_gen),
+            (unsigned char)colorDist(m_gen),
+            255
+        };
         m_population.push_back(c);
     }
 
-    // Spawn initial food
     for (int i = 0; i < 150; i++)
-        m_food.push_back(Food::spawn(m_gen));
+        m_food.push_back(Food::spawn(m_gen, WORLD_W, WORLD_H));
 }
 
 void Simulation::update() {
-    // Food regrowth (10% chance per frame, cap at 200)
+    // Food regrowth
     std::uniform_int_distribution<int> chance(1, 100);
-    if (chance(m_gen) <= 10 && m_food.size() < 200)
-        m_food.push_back(Food::spawn(m_gen));
+    if (chance(m_gen) <= 10 && (int)m_food.size() < 200)
+        m_food.push_back(Food::spawn(m_gen, WORLD_W, WORLD_H));
 
     std::vector<Creature> newBabies;
 
@@ -36,9 +40,10 @@ void Simulation::update() {
 
         // Eat food
         for (auto it = m_food.begin(); it != m_food.end(); ) {
-            float dx = c.shape.getPosition().x - it->shape.getPosition().x;
-            float dy = c.shape.getPosition().y - it->shape.getPosition().y;
-            if (std::hypot(dx, dy) < c.shape.getRadius() + it->shape.getRadius()) {
+            float dx   = c.position.x - it->position.x;
+            float dy   = c.position.y - it->position.y;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            if (dist < c.radius + it->radius) {
                 c.energy += 40.f;
                 it = m_food.erase(it);
             } else {
@@ -57,18 +62,16 @@ void Simulation::update() {
     m_population.insert(m_population.end(), newBabies.begin(), newBabies.end());
 
     // Death
-    for (auto it = m_population.begin(); it != m_population.end(); ) {
-        if (it->energy <= 0) it = m_population.erase(it);
-        else ++it;
-    }
+    for (auto it = m_population.begin(); it != m_population.end(); )
+        it = (it->energy <= 0) ? m_population.erase(it) : ++it;
 
     if ((int)m_population.size() > m_peakPop)
         m_peakPop = (int)m_population.size();
 }
 
-void Simulation::draw(sf::RenderWindow& window) const {
-    for (const auto& f : m_food)       window.draw(f.shape);
-    for (const auto& c : m_population) window.draw(c.shape);
+void Simulation::draw() const {
+    for (const auto& f : m_food)       f.draw();
+    for (const auto& c : m_population) c.draw();
 }
 
 SimStats Simulation::getStats() const {
@@ -80,8 +83,8 @@ SimStats Simulation::getStats() const {
 
     if (!m_population.empty()) {
         for (const auto& c : m_population) {
-            s.avgSize  += c.shape.getRadius();
-            s.avgSpeed += std::hypot(c.velocity.x, c.velocity.y);
+            s.avgSize  += c.radius;
+            s.avgSpeed += std::sqrt(c.velocity.x * c.velocity.x + c.velocity.y * c.velocity.y);
         }
         s.avgSize  /= m_population.size();
         s.avgSpeed /= m_population.size();

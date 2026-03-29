@@ -1,9 +1,11 @@
 #pragma once
-#include <SFML/Graphics.hpp>
+#include "raylib.h"
 #include <random>
 
 struct Food {
-    sf::CircleShape shape;
+    Vector2 position = {0, 0};
+    float   radius   = 3.f;
 
-    static Food spawn(std::mt19937& gen);
+    void draw() const;
+    static Food spawn(std::mt19937& gen, float worldW, float worldH);
 };

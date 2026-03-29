@@ -1,64 +1,125 @@
 #include "UI.h"
+#include <cmath>
+#include <algorithm>
 #include <string>
+#include <cstdio>
 
 UI::UI() {
-    m_fontLoaded = m_font.openFromFile("C:/Windows/Fonts/consola.ttf") ||
-                   m_font.openFromFile("C:/Windows/Fonts/arial.ttf")   ||
-                   m_font.openFromFile("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
-
-    m_panel.setSize({100.f, 620.f});
-    m_panel.setPosition({800.f, 0.f});
-    m_panel.setFillColor(sf::Color(15, 15, 20, 230));
-
-    m_divider.setSize({1.f, 620.f});
-    m_divider.setPosition({800.f, 0.f});
-    m_divider.setFillColor(sf::Color(60, 60, 70));
+    m_popHistory.reserve(HISTORY_LEN);
 }
 
-sf::Text UI::makeLabel(const std::string& str, float x, float y, unsigned size) {
-    sf::Text t(m_font, str, size);
-    t.setFillColor(sf::Color(220, 220, 220));
-    t.setPosition({x, y});
-    return t;
+void UI::update(const SimStats& stats) {
+    m_popHistory.push_back(stats.population);
+    if ((int)m_popHistory.size() > HISTORY_LEN)
+        m_popHistory.erase(m_popHistory.begin());
 }
 
-void UI::drawStat(sf::RenderWindow& window, const std::string& label,
-                  const std::string& value, float x, float& y) {
-    auto lbl = makeLabel(label, x, y, 11);
-    lbl.setFillColor(sf::Color(130, 130, 150));
-    window.draw(lbl);
-    y += 14.f;
-
-    auto val = makeLabel(value, x, y, 15);
-    val.setFillColor(sf::Color(240, 240, 240));
-    window.draw(val);
-    y += 48.f;
+void UI::drawStatBlock(const char* label, const char* value, int x, int& y) const {
+    DrawText(label, x, y, 10, Color{90, 90, 120, 255});
+    y += 13;
+    DrawText(value, x, y, 16, Color{230, 230, 240, 255});
+    y += 30;
 }
 
-void UI::draw(sf::RenderWindow& window, const SimStats& stats) {
-    window.draw(m_panel);
-    window.draw(m_divider);
+void UI::drawBar(float value, float maxVal, Color barColor, int x, int y, int w) const {
+    float ratio = std::clamp(value / maxVal, 0.f, 1.f);
+    // Track
+    DrawRectangle(x, y, w, 5, Color{30, 30, 45, 255});
+    // Fill
+    DrawRectangle(x, y, (int)(w * ratio), 5, barColor);
+}
 
-    if (!m_fontLoaded) return;
+void UI::drawGraph(int x, int y, int w, int h) const {
+    // Background
+    DrawRectangle(x, y, w, h, Color{10, 10, 20, 255});
+    DrawRectangleLines(x, y, w, h, Color{40, 40, 60, 255});
 
-    float lx = 808.f;
-    float ly = 12.f;
+    if (m_popHistory.size() < 2) return;
 
-    auto title = makeLabel("STATS", lx, ly, 14);
-    title.setFillColor(sf::Color(140, 200, 255));
-    window.draw(title);
-    ly += 22.f;
+    int maxPop = *std::max_element(m_popHistory.begin(), m_popHistory.end());
+    if (maxPop == 0) maxPop = 1;
 
-    sf::RectangleShape sep({84.f, 1.f});
-    sep.setPosition({lx, ly});
-    sep.setFillColor(sf::Color(60, 60, 80));
-    window.draw(sep);
-    ly += 8.f;
+    int n = (int)m_popHistory.size();
+    for (int i = 1; i < n; i++) {
+        float x0 = x + (float)(i - 1) / (HISTORY_LEN - 1) * w;
+        float x1 = x + (float)i       / (HISTORY_LEN - 1) * w;
+        float y0 = y + h - (float)m_popHistory[i - 1] / maxPop * h;
+        float y1 = y + h - (float)m_popHistory[i]     / maxPop * h;
+        DrawLineEx({x0, y0}, {x1, y1}, 1.5f, Color{100, 140, 255, 200});
+    }
+}
 
-    drawStat(window, "POP",      std::to_string(stats.population),  lx, ly);
-    drawStat(window, "PEAK",     std::to_string(stats.peakPop),     lx, ly);
-    drawStat(window, "FOOD",     std::to_string(stats.foodCount),   lx, ly);
-    drawStat(window, "BIRTHS",   std::to_string(stats.totalBirths), lx, ly);
-    drawStat(window, "AVG SZ",   std::to_string(stats.avgSize).substr(0, 4),  lx, ly);
-    drawStat(window, "AVG SPD",  std::to_string(stats.avgSpeed).substr(0, 4), lx, ly);
+void UI::draw(const SimStats& stats) const {
+    int px = PANEL_X;
+    int pw = PANEL_W;
+
+    // Panel background
+    DrawRectangle(px, 0, pw, SCREEN_H, Color{10, 10, 18, 245});
+    DrawRectangle(px, 0, 1,  SCREEN_H, Color{45, 45, 65, 255});  // left border
+
+    int lx = px + 12;
+    int ly = 14;
+
+    // Title
+    DrawText("EVOLUTION", lx, ly, 12, Color{80, 120, 200, 255});
+    ly += 16;
+    DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
+    ly += 10;
+
+    // ── Stats ──
+    char buf[32];
+
+    snprintf(buf, sizeof(buf), "%d", stats.population);
+    drawStatBlock("POPULATION", buf, lx, ly);
+
+    snprintf(buf, sizeof(buf), "%d", stats.peakPop);
+    drawStatBlock("PEAK", buf, lx, ly);
+
+    snprintf(buf, sizeof(buf), "%d", stats.foodCount);
+    drawStatBlock("FOOD", buf, lx, ly);
+
+    snprintf(buf, sizeof(buf), "%d", stats.totalBirths);
+    drawStatBlock("BIRTHS", buf, lx, ly);
+
+    // Avg size with bar
+    DrawText("AVG SIZE", lx, ly, 10, Color{90, 90, 120, 255});
+    ly += 13;
+    snprintf(buf, sizeof(buf), "%.1f", stats.avgSize);
+    DrawText(buf, lx, ly, 16, Color{230, 230, 240, 255});
+    ly += 20;
+    drawBar(stats.avgSize, 14.f, Color{120, 100, 255, 255}, lx, ly, pw - 24);
+    ly += 18;
+
+    // Avg speed with bar
+    DrawText("AVG SPEED", lx, ly, 10, Color{90, 90, 120, 255});
+    ly += 13;
+    snprintf(buf, sizeof(buf), "%.1f", stats.avgSpeed);
+    DrawText(buf, lx, ly, 16, Color{230, 230, 240, 255});
+    ly += 20;
+    drawBar(stats.avgSpeed, 8.f, Color{255, 100, 150, 255}, lx, ly, pw - 24);
+    ly += 22;
+
+    // Divider
+    DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
+    ly += 10;
+
+    // Population graph
+    DrawText("POP HISTORY", lx, ly, 10, Color{90, 90, 120, 255});
+    ly += 14;
+    drawGraph(lx, ly, pw - 24, 70);
+    ly += 78;
+
+    // Legend
+    DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
+    ly += 10;
+    DrawText("LEGEND", lx, ly, 10, Color{90, 90, 120, 255});
+    ly += 14;
+    DrawCircleV({(float)lx + 5, (float)ly + 5}, 5, Color{100, 255, 130, 255});
+    DrawText("food", lx + 14, ly, 10, Color{90, 90, 120, 255});
+    ly += 16;
+    DrawCircleLines(lx + 5, ly + 5, 6, Color{0, 255, 0, 200});
+    DrawText("high energy", lx + 14, ly, 10, Color{90, 90, 120, 255});
+    ly += 16;
+    DrawCircleLines(lx + 5, ly + 5, 6, Color{255, 0, 0, 200});
+    DrawText("low energy", lx + 14, ly, 10, Color{90, 90, 120, 255});
 }

@@ -12,7 +12,10 @@
             "compilerPath": "C:/msys64/ucrt64/bin/g++.exe",
             "cStandard": "c17",
             "cppStandard": "gnu++17",
-            "intelliSenseMode": "windows-gcc-x64"
+            "intelliSenseMode": "windows-gcc-x64",
+            "forcedInclude": [
+                "C:/msys64/ucrt64/include/raylib.h"
+            ]
         }
     ],
     "version": 4

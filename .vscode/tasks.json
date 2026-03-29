@@ -3,7 +3,7 @@
     "tasks": [
         {
             "type": "cppbuild",
-            "label": "Build SFML",
+            "label": "Build Raylib",
             "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
             "args": [
                 "-g",
@@ -16,9 +16,10 @@
                 "${fileDirname}\\Evolution.exe",
                 "-I", "C:\\msys64\\ucrt64\\include",
                 "-L", "C:\\msys64\\ucrt64\\lib",
-                "-lsfml-graphics",
-                "-lsfml-window",
-                "-lsfml-system"
+                "-lraylib",
+                "-lopengl32",
+                "-lgdi32",
+                "-lwinmm"
             ],
             "options": {
                 "cwd": "${fileDirname}"
