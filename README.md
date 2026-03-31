@@ -96,11 +96,75 @@ Food
 
 ---
 
-## 🔧 Prerequisites
+## 🔧 Prerequisites & Setup
 
-- **Compiler**: [MSYS2 UCRT64](https://www.msys2.org/) with `g++` (MinGW-w64)
-- **Raylib**: Installed via MSYS2 (`pacman -S mingw-w64-ucrt-x86_64-raylib`)
-- **OS**: Windows (the build task uses Windows-specific paths)
+> **OS**: Windows 10 or later. The build toolchain uses MSYS2 (a Unix-like environment for Windows).
+
+### Step 1 — Install MSYS2
+
+1. Download the installer from [**msys2.org**](https://www.msys2.org/).
+2. Run it and install to the default path (`C:\msys64`).
+3. When the installer finishes, it opens an MSYS2 terminal. Run this to update the package database:
+
+   ```bash
+   pacman -Syu
+   ```
+
+   The terminal may close and ask you to reopen it — that's normal. Reopen **"MSYS2 UCRT64"** from the Start Menu and run:
+
+   ```bash
+   pacman -Su
+   ```
+
+### Step 2 — Install the C++ Compiler (g++)
+
+In the **MSYS2 UCRT64** terminal, install the MinGW-w64 GCC toolchain:
+
+```bash
+pacman -S mingw-w64-ucrt-x86_64-gcc
+```
+
+Verify it installed correctly:
+
+```bash
+g++ --version
+```
+
+You should see something like `g++ (Rev..., Built by MSYS2 project) 13.x.x` or newer.
+
+### Step 3 — Install Raylib
+
+Still in the same MSYS2 UCRT64 terminal:
+
+```bash
+pacman -S mingw-w64-ucrt-x86_64-raylib
+```
+
+This installs the Raylib headers to `C:\msys64\ucrt64\include` and libraries to `C:\msys64\ucrt64\lib`.
+
+### Step 4 — Add MSYS2 to your System PATH
+
+So that VS Code (and any terminal) can find `g++`:
+
+1. Open **Settings** → search **"Environment Variables"** → click **"Edit the system environment variables"**.
+2. Under **System variables**, find `Path` and click **Edit**.
+3. Click **New** and add:
+   ```
+   C:\msys64\ucrt64\bin
+   ```
+4. Click **OK** on all dialogs and **restart any open terminals / VS Code**.
+
+Verify by opening a **new** PowerShell or CMD and running:
+
+```bash
+g++ --version
+```
+
+### Step 5 — Install VS Code + C/C++ Extension (recommended)
+
+1. Install [**Visual Studio Code**](https://code.visualstudio.com/) if you don't have it.
+2. Open VS Code → go to the **Extensions** tab (`Ctrl+Shift+X`).
+3. Search and install **"C/C++"** by Microsoft (provides IntelliSense, debugging, etc.).
 
 ---
 
@@ -108,11 +172,16 @@ Food
 
 ### Option A: VS Code (recommended)
 
-1. Open the project folder in VS Code.
-2. Press `Ctrl+Shift+B` to build (uses the configured task in `.vscode/tasks.json`).
-3. Run `Evolution.exe` from the project directory.
+1. Open the project folder in VS Code (`File → Open Folder`).
+2. Press **`Ctrl+Shift+B`** to build — this uses the pre-configured task in `.vscode/tasks.json`.
+3. If the build succeeds, you'll see `Evolution.exe` appear in the project directory.
+4. Run it by either:
+   - Opening a terminal in VS Code (`` Ctrl+` ``) and typing `.\Evolution.exe`
+   - Or double-clicking `Evolution.exe` in File Explorer.
 
-### Option B: Command line
+### Option B: Command line (MSYS2 UCRT64 terminal)
+
+Navigate to the project folder and run:
 
 ```bash
 g++ -g main.cpp Simulation.cpp Creature.cpp Food.cpp UI.cpp \
@@ -127,6 +196,15 @@ Then run:
 ```bash
 ./Evolution.exe
 ```
+
+### ⚠️ Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `g++ is not recognized` | You didn't add `C:\msys64\ucrt64\bin` to your system PATH (Step 4), or you need to restart your terminal. |
+| `raylib.h: No such file` | Raylib isn't installed. Run `pacman -S mingw-w64-ucrt-x86_64-raylib` in the MSYS2 UCRT64 terminal (Step 3). |
+| `undefined reference to ...` | Make sure you're linking all four libraries: `-lraylib -lopengl32 -lgdi32 -lwinmm`. Order matters — keep `-lraylib` first. |
+| Window opens then immediately closes | Run from a terminal so you can see any error messages. Check that your GPU drivers are up to date (Raylib uses OpenGL). |
 
 ---
 
