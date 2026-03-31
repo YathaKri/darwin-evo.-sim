@@ -1,5 +1,5 @@
 # 🧬 Darwin — Evolution Simulator
-
+bruhhhhhhhhhhhhhhhhhhh
 A real-time **Darwinian natural selection** simulator built with **C++** and **Raylib**. Watch a population of creatures compete for food, reproduce with genetic mutations, and evolve emergent survival strategies — all rendered with glowing, particle-like visuals on a dark canvas.
 
 ---
