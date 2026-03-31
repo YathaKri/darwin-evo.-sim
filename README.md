@@ -1,79 +1,118 @@
-# 🧬 Evolution Simulator
+# 🧬 Darwin — Evolution Simulator
 
-A real-time natural selection simulation built with **C++** and **Raylib**. Creatures roam a 2D world, hunt for food, reproduce with mutation, and die — letting evolution play out live on screen with every run producing something different.
-
-![C++](https://img.shields.io/badge/C++-17-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
-![Raylib](https://img.shields.io/badge/Raylib-5.5-black?style=for-the-badge)
-![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+A real-time **Darwinian natural selection** simulator built with **C++** and **Raylib**. Watch a population of creatures compete for food, reproduce with genetic mutations, and evolve emergent survival strategies — all rendered with glowing, particle-like visuals on a dark canvas.
 
 ---
 
 ## ✨ Features
 
-- 🔴 **Energy rings** — color shifts green → yellow → red as a creature's energy drops
-- 💫 **Motion trails** — each creature leaves a fading trail showing speed and direction
-- 🌟 **Glow effects** — soft layered glow around every creature and food pellet
-- 📊 **Live stats panel** — population, peak pop, food count, births, avg size & speed
-- 📈 **Population history graph** — watch booms and crashes in real time
-- 🌱 **Dynamic food regrowth** — food slowly regenerates, creating natural pressure cycles
-- 🔬 **Mutation system** — size, speed, and color all drift across generations
+### Evolutionary Mechanics
+- **Heritable traits** — Body size, speed, color, and vision range are passed from parent to child with random mutations.
+- **Natural selection** — Creatures that eat efficiently survive longer and reproduce more, passing their successful traits forward.
+- **Energy system** — Every creature burns energy proportional to its body size, movement speed, and vision range. Eat food to survive, starve to die.
+- **Asexual reproduction** — When a creature accumulates enough energy (≥ 200), it splits into parent + mutated offspring.
+
+### Creature Vision & Food Seeking
+- Each creature has a **vision range** trait controlling how far it can detect food.
+- Creatures **steer toward** the closest visible food pellet using a simple seek-steering behavior.
+- A **max speed cap** (4.0) prevents runaway acceleration.
+- Vision has a **biological cost** — wider vision drains more energy per frame, creating a natural trade-off between awareness and efficiency.
+
+### Time Manipulation
+| Key | Action |
+|---|---|
+| `Space` | Toggle **Pause** / Play |
+| `→` (hold) | **Fast Forward** (5× speed) |
+| `←` (hold) | **Rewind** (step backwards through history) |
+
+- **Snapshot-based rewind** — The simulator stores the last **600 frames** (~10 seconds) of full simulation state. Holding left arrow replays them in reverse, restoring creatures, food, and all stats exactly.
+- **Fast forward** runs 5 physics updates per render frame for accelerated viewing.
+- A subtle **red VHS-style overlay** flashes during rewind for visual feedback.
+
+### Live Statistics Dashboard
+A side panel displays real-time evolutionary data:
+
+| Stat | Description |
+|---|---|
+| Population | Current number of living creatures |
+| Peak | Highest population ever reached |
+| Food | Number of food pellets on the field |
+| Births | Total creatures ever born |
+| Avg Size | Mean body radius across the population |
+| Avg Speed | Mean velocity magnitude |
+| Avg Vision | Mean vision range (the evolving trait!) |
+| Pop History | Rolling line graph of population over time |
+| Rewind Buffer | Visual bar showing how much rewind history is stored |
+| Playback State | Current mode: `>> PLAYING`, `|| PAUSED`, `>>> FAST FWD`, or `<< REWIND` |
+
+### Visual Design
+- **Glow effects** — Each creature is rendered with layered alpha-blended circles for a soft neon glow.
+- **Motion trails** — Fading trails show recent movement paths.
+- **Energy ring** — A color-coded ring around each creature shifts from 🟢 green (full energy) → 🟡 yellow → 🔴 red (starving).
+- **Vision debug ring** — A very faint circle shows each creature's perception radius.
+- **Food glow** — Food pellets have a soft green bloom effect.
+- **Dark grid background** — Subtle grid lines over a near-black canvas.
 
 ---
 
-## 🧠 How It Works
-
-Every creature has three heritable traits that are passed down and mutated each generation:
-
-| Trait | Effect |
-|-------|--------|
-| 🔵 **Size** | Bigger creatures eat food more easily but burn energy faster |
-| ⚡ **Speed** | Faster creatures cover more ground but cost more energy |
-| 🎨 **Color** | Drifts each generation — a visual trace of lineage over time |
-
-Each frame, creatures move around the world bouncing off walls and burning energy. When a creature eats enough food to reach **200 energy** it reproduces, cloning itself with small random mutations. When energy hits **zero** the creature dies.
-
-Food slowly regrows each frame (10% chance per frame, capped at 200 pellets), creating natural boom-and-bust population cycles.
-
----
-
-## 🗂️ Project Structure
+## 🏗️ Project Structure
 
 ```
-Evolution/
-├── main.cpp            # Window setup and main loop
-├── Simulation.h/.cpp   # Core logic — spawning, eating, death
-├── Creature.h/.cpp     # Movement, energy, reproduction & mutation, drawing
-├── Food.h/.cpp         # Food spawning and drawing
-├── UI.h/.cpp           # Sidebar stats panel and population graph
+darwin-evo-sim/
+├── main.cpp            # Window setup, input handling, game loop
+├── Simulation.h/cpp    # Core simulation: spawning, physics, eating, reproduction, rewind
+├── Creature.h/cpp      # Creature struct: movement, steering, drawing, mutation
+├── Food.h/cpp          # Food struct: spawning and rendering
+├── UI.h/cpp            # Stats panel, graphs, playback indicators
 └── .vscode/
-    ├── tasks.json              # Build task
-    └── c_cpp_properties.json   # IntelliSense config
+    └── tasks.json      # VS Code build task (g++ via MSYS2 UCRT64)
+```
+
+### Architecture Overview
+
+```
+main.cpp
+  ├── reads input (Space, ←, →)
+  ├── calls Simulation::update() / rewindOneStep()
+  ├── calls UI::update() / popLastHistory()
+  └── draws everything
+
+Simulation
+  ├── owns m_population (vector<Creature>)
+  ├── owns m_food (vector<Food>)
+  ├── owns m_history (deque<Snapshot>) for rewind
+  ├── update(): food regrowth → creature AI → eating → reproduction → death
+  └── rewindOneStep(): pops last snapshot, restores full state
+
+Creature
+  ├── update(): vision scan → steering → movement → wall bounce → energy burn
+  ├── draw(): vision ring → trail → glow → body → energy ring
+  └── reproduce(): deep-copy + mutate all traits
+
+Food
+  ├── spawn(): random position
+  └── draw(): green glow + core
 ```
 
 ---
 
-## ⚙️ Requirements
+## 🔧 Prerequisites
 
-- [MSYS2](https://www.msys2.org/) with the **UCRT64** toolchain
-- **Raylib 5.x** installed via MSYS2
-- **VS Code** with the C/C++ extension (optional but recommended)
-
-### Install Raylib
-
-Open the MSYS2 UCRT64 terminal and run:
-
-```bash
-pacman -S mingw-w64-ucrt-x86_64-raylib
-```
+- **Compiler**: [MSYS2 UCRT64](https://www.msys2.org/) with `g++` (MinGW-w64)
+- **Raylib**: Installed via MSYS2 (`pacman -S mingw-w64-ucrt-x86_64-raylib`)
+- **OS**: Windows (the build task uses Windows-specific paths)
 
 ---
 
-## 🔨 Building
+## 🚀 Building & Running
 
-Open the project folder in VS Code and press `Ctrl+Shift+B` to run the default build task. This compiles all source files and outputs `Evolution.exe`.
+### Option A: VS Code (recommended)
 
-Or build manually from the terminal:
+1. Open the project folder in VS Code.
+2. Press `Ctrl+Shift+B` to build (uses the configured task in `.vscode/tasks.json`).
+3. Run `Evolution.exe` from the project directory.
+
+### Option B: Command line
 
 ```bash
 g++ -g main.cpp Simulation.cpp Creature.cpp Food.cpp UI.cpp \
@@ -83,30 +122,61 @@ g++ -g main.cpp Simulation.cpp Creature.cpp Food.cpp UI.cpp \
     -lraylib -lopengl32 -lgdi32 -lwinmm
 ```
 
----
+Then run:
 
-## 👀 What to Watch For
-
-> The sim is different every run — here's what makes it interesting to observe:
-
-- **Color drift** — populations slowly shift hue as mutations stack up over generations
-- **Size pressure** — when food is scarce, smaller creatures survive longer since they burn less energy
-- **Speed trade-off** — fast creatures find food first but starve quickly if supply drops
-- **Population crashes** — a boom strips the food supply, causing a sudden mass die-off
-- **Recovery** — after a crash, survivors with efficient traits rebuild the population
+```bash
+./Evolution.exe
+```
 
 ---
 
-## 🗺️ Roadmap
+## 🎮 Controls
 
-- [ ] Creature vision — sense nearby food and steer toward it
-- [ ] Predators — a second species that hunts creatures
-- [ ] Sexual reproduction — two parents combine traits
-- [ ] Exportable stats — save population data to CSV
-- [ ] Shader-based bloom — GPU glow using Raylib render textures
+| Key | Action |
+|---|---|
+| `Space` | Pause / Resume |
+| `→` (hold) | Fast Forward (5× speed) |
+| `←` (hold) | Rewind (works while paused too) |
+| `Esc` | Quit |
 
 ---
 
-## 📄 License
+## 🧪 How Evolution Emerges
 
-MIT — do whatever you want with it.
+The simulation doesn't have hard-coded "winning strategies." Instead, natural selection emerges from the interplay of simple rules:
+
+1. **Energy formula**: `cost = (radius × 0.015) + (speed × 0.02) + (visionRange × 0.0003)`
+2. **Food reward**: +40 energy per pellet eaten.
+3. **Reproduction threshold**: 200 energy → split (parent reset to 100, child starts at 100).
+4. **Death**: Energy ≤ 0 → removed.
+
+Over time you'll typically observe:
+- **Size** tends to shrink (smaller = cheaper to maintain).
+- **Speed** settles into a moderate range (too slow = can't reach food, too fast = burns energy).
+- **Vision range** finds a sweet spot (wider vision finds food faster but costs more energy).
+- **Color drift** is neutral — it's not linked to fitness, so it undergoes random walk / genetic drift.
+
+---
+
+## 📐 Simulation Parameters
+
+| Parameter | Value | Location |
+|---|---|---|
+| World size | 860 × 640 px | `Simulation.h` |
+| Initial population | 30 | `Simulation.cpp` |
+| Initial food | 150 | `Simulation.cpp` |
+| Food cap | 200 | `Simulation::update()` |
+| Food spawn chance | 10% per frame | `Simulation::update()` |
+| Reproduce threshold | 200 energy | `Simulation::update()` |
+| Max speed | 4.0 | `Creature.h` |
+| Steer force | 0.12 | `Creature.h` |
+| Default vision range | 100.0 | `Creature.h` |
+| Vision range bounds | [20, 300] | `Creature::reproduce()` |
+| Rewind buffer | 600 frames (~10s) | `Simulation.h` |
+| Fast forward | 5× per frame | `main.cpp` |
+
+---
+
+## 📝 License
+
+This project is provided for educational purposes. Feel free to use, modify, and learn from it.
