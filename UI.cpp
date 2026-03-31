@@ -14,6 +14,11 @@ void UI::update(const SimStats& stats) {
         m_popHistory.erase(m_popHistory.begin());
 }
 
+void UI::popLastHistory() {
+    if (!m_popHistory.empty())
+        m_popHistory.pop_back();
+}
+
 void UI::drawStatBlock(const char* label, const char* value, int x, int& y) const {
     DrawText(label, x, y, 10, Color{90, 90, 120, 255});
     y += 13;
@@ -49,7 +54,7 @@ void UI::drawGraph(int x, int y, int w, int h) const {
     }
 }
 
-void UI::draw(const SimStats& stats) const {
+void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames) const {
     int px = PANEL_X;
     int pw = PANEL_W;
 
@@ -65,6 +70,48 @@ void UI::draw(const SimStats& stats) const {
     ly += 16;
     DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
     ly += 10;
+
+    // ── Playback state indicator ──────────────────────────────
+    {
+        const char* label = "";
+        Color       col   = {230, 230, 240, 255};
+
+        switch (mode) {
+            case PlayMode::Playing:
+                label = ">> PLAYING";
+                col   = {80, 255, 130, 255};
+                break;
+            case PlayMode::Paused:
+                label = "|| PAUSED";
+                col   = {255, 200, 80, 255};
+                break;
+            case PlayMode::FastForward:
+                label = ">>> FAST FWD";
+                col   = {100, 180, 255, 255};
+                break;
+            case PlayMode::Rewinding:
+                label = "<< REWIND";
+                col   = {255, 100, 130, 255};
+                break;
+        }
+
+        DrawText(label, lx, ly, 12, col);
+        ly += 16;
+
+        // Rewind buffer bar
+        DrawText("REWIND BUFFER", lx, ly, 8, Color{70, 70, 100, 255});
+        ly += 10;
+        float bufRatio = std::clamp((float)historyFrames / 600.f, 0.f, 1.f);
+        DrawRectangle(lx, ly, pw - 24, 4, Color{30, 30, 45, 255});
+        Color barCol = (mode == PlayMode::Rewinding)
+                            ? Color{255, 100, 130, 200}
+                            : Color{80, 80, 120, 200};
+        DrawRectangle(lx, ly, (int)((pw - 24) * bufRatio), 4, barCol);
+        ly += 12;
+
+        DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
+        ly += 10;
+    }
 
     // ── Stats ──
     char buf[32];
@@ -134,4 +181,6 @@ void UI::draw(const SimStats& stats) const {
     ly += 16;
     DrawCircleLines(lx + 5, ly + 5, 10, Color{255, 200, 80, 30});
     DrawText("vision range", lx + 14, ly, 10, Color{90, 90, 120, 255});
+    ly += 16;
+    DrawText("[SPACE] pause  [</>] rew/ff", lx, ly, 8, Color{60, 60, 90, 255});
 }

@@ -27,7 +27,30 @@ Simulation::Simulation() : m_gen(std::random_device{}()) {
         m_food.push_back(Food::spawn(m_gen, WORLD_W, WORLD_H));
 }
 
+// ── Snapshot helpers ───────────────────────────────────────────
+void Simulation::saveSnapshot() {
+    if ((int)m_history.size() >= MAX_HISTORY)
+        m_history.pop_front();           // discard oldest
+
+    m_history.push_back({m_population, m_food, m_totalBirths, m_peakPop});
+}
+
+void Simulation::rewindOneStep() {
+    if (m_history.empty()) return;
+
+    const Snapshot& snap = m_history.back();
+    m_population  = snap.population;
+    m_food        = snap.food;
+    m_totalBirths = snap.totalBirths;
+    m_peakPop     = snap.peakPop;
+    m_history.pop_back();
+}
+
+// ── Normal update ──────────────────────────────────────────────
 void Simulation::update() {
+    // Save state *before* this tick so rewind undoes it
+    saveSnapshot();
+
     // Food regrowth
     std::uniform_int_distribution<int> chance(1, 100);
     if (chance(m_gen) <= 10 && (int)m_food.size() < 200)

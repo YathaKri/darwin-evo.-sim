@@ -12,7 +12,8 @@ public:
     UI();
 
     void update(const SimStats& stats);  // call once per frame to record history
-    void draw(const SimStats& stats) const;
+    void popLastHistory();               // remove newest graph point (for rewind)
+    void draw(const SimStats& stats, PlayMode mode, int historyFrames) const;
 
 private:
     std::vector<int> m_popHistory;       // rolling population history for graph
