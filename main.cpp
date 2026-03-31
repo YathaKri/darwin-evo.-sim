@@ -8,7 +8,7 @@ int main() {
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);   // anti-aliasing for smooth circles
     InitWindow(screenW, screenH, "Evolution Simulator");
-    SetTargetFPS(100);
+    SetTargetFPS(60);
 
     Simulation sim;
     UI         ui;
