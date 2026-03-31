@@ -121,7 +121,8 @@ Food
 In the **MSYS2 UCRT64** terminal, install the MinGW-w64 GCC toolchain:
 
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-gcc
+pacman -S mingw-w64-ucrt-x86_64-toolchain
+
 ```
 
 Verify it installed correctly:
