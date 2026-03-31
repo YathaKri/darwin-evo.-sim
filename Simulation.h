@@ -11,6 +11,7 @@ struct SimStats {
     int   totalBirths = 0;
     float avgSize     = 0.f;
     float avgSpeed    = 0.f;
+    float avgVision   = 0.f;
 };
 
 class Simulation {

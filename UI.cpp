@@ -97,6 +97,15 @@ void UI::draw(const SimStats& stats) const {
     DrawText(buf, lx, ly, 16, Color{230, 230, 240, 255});
     ly += 20;
     drawBar(stats.avgSpeed, 8.f, Color{255, 100, 150, 255}, lx, ly, pw - 24);
+    ly += 18;
+
+    // Avg vision with bar
+    DrawText("AVG VISION", lx, ly, 10, Color{90, 90, 120, 255});
+    ly += 13;
+    snprintf(buf, sizeof(buf), "%.0f", stats.avgVision);
+    DrawText(buf, lx, ly, 16, Color{230, 230, 240, 255});
+    ly += 20;
+    drawBar(stats.avgVision, 300.f, Color{255, 200, 80, 255}, lx, ly, pw - 24);
     ly += 22;
 
     // Divider
@@ -122,4 +131,7 @@ void UI::draw(const SimStats& stats) const {
     ly += 16;
     DrawCircleLines(lx + 5, ly + 5, 6, Color{255, 0, 0, 200});
     DrawText("low energy", lx + 14, ly, 10, Color{90, 90, 120, 255});
+    ly += 16;
+    DrawCircleLines(lx + 5, ly + 5, 10, Color{255, 200, 80, 30});
+    DrawText("vision range", lx + 14, ly, 10, Color{90, 90, 120, 255});
 }

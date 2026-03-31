@@ -36,7 +36,7 @@ void Simulation::update() {
     std::vector<Creature> newBabies;
 
     for (auto& c : m_population) {
-        c.update(WORLD_W, WORLD_H);
+        c.update(WORLD_W, WORLD_H, m_food);
 
         // Eat food
         for (auto it = m_food.begin(); it != m_food.end(); ) {
@@ -83,11 +83,13 @@ SimStats Simulation::getStats() const {
 
     if (!m_population.empty()) {
         for (const auto& c : m_population) {
-            s.avgSize  += c.radius;
-            s.avgSpeed += std::sqrt(c.velocity.x * c.velocity.x + c.velocity.y * c.velocity.y);
+            s.avgSize   += c.radius;
+            s.avgSpeed  += std::sqrt(c.velocity.x * c.velocity.x + c.velocity.y * c.velocity.y);
+            s.avgVision += c.visionRange;
         }
-        s.avgSize  /= m_population.size();
-        s.avgSpeed /= m_population.size();
+        s.avgSize   /= m_population.size();
+        s.avgSpeed  /= m_population.size();
+        s.avgVision /= m_population.size();
     }
 
     return s;
