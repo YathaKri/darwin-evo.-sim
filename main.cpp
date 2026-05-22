@@ -1,76 +1,175 @@
 #include "raylib.h"
 #include "Simulation.h"
 #include "UI.h"
+#include <string>
+#include <iostream>
 
 int main() {
-    const int screenW = Simulation::WORLD_W + UI::PANEL_W;
-    const int screenH = Simulation::WORLD_H;
-
-    SetConfigFlags(FLAG_MSAA_4X_HINT);   // anti-aliasing for smooth circles
-    InitWindow(screenW, screenH, "Evolution Simulator");
+    // Enable window resizing
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(1040, 640, "Darwin Evolution Simulator - 5C^2 Hackathon");
     SetTargetFPS(60);
 
     Simulation sim;
-    UI         ui;
+    sim.init(80, 0.8f, 150);
+    UI ui;
 
-    bool     paused = false;
-    PlayMode mode   = PlayMode::Playing;
+    PlayMode mode = PlayMode::Playing;
+    
+    // Click-to-select state
+    int selectedCreatureId = -1;
+    const Creature* selectedCreature = nullptr;
+    
+    // Status message overlay
+    std::string statusMsg = "";
+    int statusTimer = 0;
 
-    static constexpr int FF_MULTIPLIER = 5;   // how many updates per frame when fast-forwarding
+    auto showStatus = [&](const std::string& msg) {
+        statusMsg = msg;
+        statusTimer = 180; // 3 seconds at 60fps
+    };
 
     while (!WindowShouldClose()) {
-        // ── Input ──────────────────────────────────────────────
-        if (IsKeyPressed(KEY_SPACE))
-            paused = !paused;
-
-        bool fastForward = !paused && IsKeyDown(KEY_RIGHT);
-        bool rewinding   = IsKeyDown(KEY_LEFT);          // works even when paused
-
-        // Determine display mode
-        if (rewinding)              mode = PlayMode::Rewinding;
-        else if (paused)            mode = PlayMode::Paused;
-        else if (fastForward)       mode = PlayMode::FastForward;
-        else                        mode = PlayMode::Playing;
-
-        // ── Simulation tick ────────────────────────────────────
-        if (rewinding) {
-            // Rewind: restore previous snapshot and reverse the graph
-            sim.rewindOneStep();
-            ui.popLastHistory();
-        } else if (paused) {
-            // Don't update simulation — just keep drawing
-
-        } else if (fastForward) {
-            // Run multiple updates per frame
-            for (int i = 0; i < FF_MULTIPLIER; i++) {
-                sim.update();
-                ui.update(sim.getStats());   // record each sub-step for the graph
-            }
-
-        } else {
-            // Normal play
-            sim.update();
-            ui.update(sim.getStats());
+        // ── Window Resizing & Fullscreen ────────────────────────────
+        
+        if (IsKeyPressed(KEY_F11)) {
+            ToggleFullscreen();
         }
 
-        // ── Draw ───────────────────────────────────────────────
-        BeginDrawing();
-            ClearBackground(Color{14, 14, 20, 255});
+        // Pause simulation if the window is actively being resized
+        if (IsWindowResized()) {
+            mode = PlayMode::Paused;
+            showStatus("Simulation Paused (Window Resized)");
+        }
 
-            // Draw a subtle grid over the sim area
-            for (int x = 0; x < (int)Simulation::WORLD_W; x += 60)
-                DrawLine(x, 0, x, screenH, Color{255, 255, 255, 6});
-            for (int y = 0; y < screenH; y += 60)
-                DrawLine(0, y, (int)Simulation::WORLD_W, y, Color{255, 255, 255, 6});
+        int screenW = GetScreenWidth();
+        int screenH = GetScreenHeight();
+        
+        // Calculate new world bounds (leaving room for UI panel)
+        int panelX = screenW - UI::PANEL_W;
+        if (panelX < 400) panelX = 400; // minimum world width
+        sim.setWorldSize((float)panelX, (float)screenH);
 
-            sim.draw();
-            ui.draw(sim.getStats(), mode, sim.historySize());
+        // ── Input Handling ──────────────────────────────────────────
+        
+        // Play / Pause
+        if (IsKeyPressed(KEY_SPACE)) {
+            if (mode == PlayMode::Paused) mode = PlayMode::Playing;
+            else mode = PlayMode::Paused;
+        }
 
-            // Overlay flash when rewinding (subtle VHS-style effect)
-            if (rewinding) {
-                DrawRectangle(0, 0, (int)Simulation::WORLD_W, screenH,
-                              Color{255, 80, 100, 12});
+        // Rewind / Fast Forward
+        if (IsKeyDown(KEY_LEFT)) {
+            mode = PlayMode::Rewinding;
+        } else if (IsKeyDown(KEY_RIGHT)) {
+            mode = PlayMode::FastForward;
+        } else if (mode == PlayMode::Rewinding || mode == PlayMode::FastForward) {
+            mode = PlayMode::Playing;
+        }
+
+        // File I/O triggers
+        if (IsKeyPressed(KEY_S)) {
+            sim.saveGenomes("genomes_saved.txt");
+            showStatus("Saved genomes to genomes_saved.txt");
+        }
+        if (IsKeyPressed(KEY_L)) {
+            sim.loadGenomes("genomes_saved.txt");
+            showStatus("Loaded genomes from genomes_saved.txt");
+        }
+        if (IsKeyPressed(KEY_G)) {
+            sim.generateReport("simulation_report.txt");
+            showStatus("Generated simulation_report.txt");
+        }
+
+        // ── Click-to-select organism ────────────────────────────────
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            Vector2 mouse = GetMousePosition();
+            // Only detect clicks in the simulation canvas (not the UI panel)
+            if (mouse.x < (float)panelX) {
+                selectedCreatureId = -1;
+                selectedCreature = nullptr;
+                float closestDist = 9999.f;
+
+                for (const auto& c : sim.getCreatures()) {
+                    float dx = mouse.x - c->position.x;
+                    float dy = mouse.y - c->position.y;
+                    float dist = std::sqrt(dx * dx + dy * dy);
+                    // Click within the creature's body or a generous click area
+                    float clickRadius = c->radius + 6.f;
+                    if (dist < clickRadius && dist < closestDist) {
+                        closestDist = dist;
+                        selectedCreatureId = c->id;
+                    }
+                }
             }
+        }
+
+        // Right-click or ESC to deselect
+        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsKeyPressed(KEY_ESCAPE)) {
+            selectedCreatureId = -1;
+            selectedCreature = nullptr;
+        }
+
+        // Refresh the pointer each frame (creature may have died)
+        if (selectedCreatureId != -1) {
+            selectedCreature = sim.findCreature(selectedCreatureId);
+            if (!selectedCreature) selectedCreatureId = -1;  // died, deselect
+        }
+
+        // Status timer
+        if (statusTimer > 0) {
+            statusTimer--;
+        } else {
+            statusMsg = "";
+        }
+
+        // ── Simulation Logic Update ─────────────────────────────────
+        
+        if (mode == PlayMode::Playing) {
+            sim.update();
+            ui.update(sim.getStats());
+        } 
+        else if (mode == PlayMode::FastForward) {
+            // Run twice per frame
+            sim.update();
+            sim.update();
+            ui.update(sim.getStats());
+        } 
+        else if (mode == PlayMode::Rewinding) {
+            // Restores history state
+            sim.rewindOneStep();
+            ui.popLastHistory();
+        }
+
+        // ── Render ──────────────────────────────────────────────────
+        
+        BeginDrawing();
+        ClearBackground(Color{15, 15, 20, 255}); // Dark slate background
+
+        // Draw entities (Simulation handles polymorphism Creature vs Hazard)
+        sim.draw();
+
+        // Highlight selected creature
+        if (selectedCreature) {
+            Vector2 pos = selectedCreature->getPosition();
+            float r = selectedCreature->getRadius();
+            // Pulsing selection ring
+            float pulse = 0.7f + 0.3f * std::sin((float)GetTime() * 5.f);
+            unsigned char alpha = (unsigned char)(180 * pulse);
+            DrawCircleLines((int)pos.x, (int)pos.y, r + 6.f, {0, 255, 120, alpha});
+            DrawCircleLines((int)pos.x, (int)pos.y, r + 7.f, {0, 255, 120, (unsigned char)(alpha / 2)});
+
+            // "SELECTED" label
+            const char* label = "SELECTED";
+            int textW = MeasureText(label, 10);
+            DrawText(label, (int)pos.x - textW / 2, (int)pos.y - (int)r - 16, 10, {0, 255, 120, 200});
+        }
+
+        // Draw UI overlay panel (dynamically positioned based on window size)
+        ui.draw(sim.getStats(), mode, sim.historySize(),
+                selectedCreature,
+                statusMsg.empty() ? nullptr : statusMsg.c_str(),
+                panelX, screenH);
 
         EndDrawing();
     }
