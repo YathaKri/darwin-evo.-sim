@@ -3,6 +3,7 @@
 #include "Food.h"
 #include "Hazard.h"
 #include "Genome.h"
+#include "Disaster.h"
 #include <vector>
 #include <random>
 #include <deque>
@@ -91,6 +92,12 @@ public:
     int  getFoodDropMult() const { return m_foodDropMult; }
     void setFoodDropMult(int m) { m_foodDropMult = m; }
 
+    // ── Input Disaster API ───────────────────────────────────────
+    void spawnDisaster(Disaster d);
+    bool canSpawnDisaster() const { return m_disasterCooldown <= 0; }
+    int  getDisasterCooldown() const { return m_disasterCooldown; }
+    std::mt19937& getRng() { return m_gen; }
+
 private:
     std::mt19937 m_gen;
     float        m_mutationRate    = 0.8f;
@@ -108,6 +115,10 @@ private:
     std::vector<std::unique_ptr<Creature>> m_population;
     std::vector<Food>                      m_food;
     std::vector<std::unique_ptr<Hazard>>   m_hazards;
+
+    // ── Input disasters (user-triggered) ─────────────────────────
+    std::vector<Disaster> m_disasters;
+    int m_disasterCooldown = 0;
 
     int m_totalBirths = 0;
     int m_totalFights = 0;

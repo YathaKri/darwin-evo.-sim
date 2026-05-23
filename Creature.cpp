@@ -1,4 +1,5 @@
 #include "Creature.h"
+#include "Hazard.h"
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -8,13 +9,20 @@ void Creature::applyGenome() {
     radius      = genome.size;
     color       = genome.getColor();
     visionRange = genome.visionRange;
-    maxHp       = 80.f + genome.size * 4.f;   // bigger = more HP
+    maxHp       = 80.f + genome.size * 4.f;   // base HP formula
+    
+    // Add 10% max HP per size mutation additively
+    if (mutations.sizeCount > 0) {
+        maxHp += maxHp * (0.10f * mutations.sizeCount);
+    }
+    
     hp          = maxHp;
 }
 
 // ── Per-frame update ────────────────────────────────────────────
 void Creature::update(float worldW, float worldH, const std::vector<Food>& food,
                       const std::vector<std::unique_ptr<Creature>>& population,
+                      const std::vector<std::unique_ptr<Hazard>>& hazards,
                       std::mt19937& gen) {
     ++age;
 
@@ -133,11 +141,22 @@ void Creature::update(float worldW, float worldH, const std::vector<Food>& food,
     // (d) Size mutation: more size stacks = faster drain
     float sizeDrainPenalty = 1.f + (mutations.sizeCount * 0.08f);
 
+    float famineMult = 1.0f;
+    for (const auto& h : hazards) {
+        if (h->getType() == HazardType::Famine) {
+            float dx = position.x - h->getPosition().x;
+            float dy = position.y - h->getPosition().y;
+            if (dx*dx + dy*dy < h->getRadius() * h->getRadius()) {
+                famineMult = std::max(famineMult, famBadge ? 1.25f : 2.0f);
+            }
+        }
+    }
+
     if (bigFoodTimer > 0) {
         bigFoodTimer--;
         energy = 200.f; // Keep max energy while buff is active
     } else {
-        energy -= baseCost * staminaReduction * sizeDrainPenalty;
+        energy -= baseCost * staminaReduction * sizeDrainPenalty * famineMult;
     }
 }
 
@@ -319,6 +338,24 @@ void Creature::draw() const {
             DrawLineV(outer1, inner, goldEdge);
             DrawLineV(inner, outer2, goldEdge);
         }
+        badgeOffsetX += 10.f;
+    }
+
+    // FAM badge: bronze hexagon
+    if (famBadge) {
+        float bx = position.x - radius - 4.f - badgeOffsetX;
+        float by = position.y - radius - 2.f;
+        float bs = 3.5f;
+        Color bronze = {205, 127, 50, 255};
+        for (int i = 0; i < 6; i++) {
+            float a1 = (2.f * 3.14159f / 6.f) * i - 3.14159f / 2.f;
+            float a2 = (2.f * 3.14159f / 6.f) * (i + 1) - 3.14159f / 2.f;
+            Vector2 outer1 = {bx + bs * std::cos(a1), by + bs * std::sin(a1)};
+            Vector2 outer2 = {bx + bs * std::cos(a2), by + bs * std::sin(a2)};
+            DrawTriangle({bx, by}, outer1, outer2, bronze);
+            DrawLineV(outer1, outer2, bronze);
+        }
+        badgeOffsetX += 10.f;
     }
 
     // --- MUTATION ICONS (right side of creature) ---
@@ -424,10 +461,7 @@ Creature Creature::reproduce(std::mt19937& gen, const Creature& other) const {
     child.age          = 0;
 
     // ── Immunity inheritance (70% per gene, independent) ──
-    if (toxImmune || other.toxImmune)
-        child.toxImmune = (chance(gen) < 0.7f);
-    if (radImmune || other.radImmune)
-        child.radImmune = (chance(gen) < 0.7f);
+    // Tox and Rad immunities are NO LONGER inherited
 
     // ════════════════════════════════════════════════════════════
     //  MUTATION INHERITANCE (pool from both parents)

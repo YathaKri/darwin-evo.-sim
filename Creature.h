@@ -6,6 +6,8 @@
 #include <vector>
 #include <memory>
 
+class Hazard;
+
 // ── Organism shape types (inherited via Genome) ─────────────────
 enum class ShapeType { Circle, Triangle, Diamond, Pentagon, Hexagon };
 
@@ -36,13 +38,14 @@ struct Creature : public Entity {
     // ── Hazard immunity (inherited from survivors) ──
     bool  toxImmune    = false;   // immune to Toxic hazards
     bool  radImmune    = false;   // immune to Radiation hazards
+    bool  famBadge     = false;   // bronze hexagon badge from Famine
 
     // ── Flee state (escaping hazards) ──
     bool    fleeing     = false;
     Vector2 fleeTarget  = {0, 0};
 
     // ── Badge check ──
-    bool hasBadge() const { return toxImmune || radImmune; }
+    bool hasBadge() const { return toxImmune || radImmune || famBadge; }
 
     // ── Damage flash ──
     int   flashTimer   = 0;       // frames remaining for white flash
@@ -99,6 +102,7 @@ struct Creature : public Entity {
     // ── Core methods ──
     void     update(float worldW, float worldH, const std::vector<Food>& food,
                     const std::vector<std::unique_ptr<Creature>>& population,
+                    const std::vector<std::unique_ptr<Hazard>>& hazards,
                     std::mt19937& gen);
     Creature reproduce(std::mt19937& gen, const Creature& other) const;
 

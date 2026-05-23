@@ -10,11 +10,16 @@ Hazard::Hazard(Vector2 pos, float radius, HazardType type, int lifetime)
         m_instantDamage = 1.5f;
         m_dotDamage     = 0.f;
         m_dotDuration   = 0;
-    } else {
+    } else if (type == HazardType::Toxic) {
         // TOX: lower instant damage, but applies a lingering DOT
         m_instantDamage = 0.4f;
         m_dotDamage     = 0.3f;      // damage per frame while poisoned
         m_dotDuration   = 180;       // 3 seconds of lingering poison at 60fps
+    } else {
+        // FAM: no HP damage, handles food and energy drain
+        m_instantDamage = 0.f;
+        m_dotDamage     = 0.f;
+        m_dotDuration   = 0;
     }
 }
 
@@ -26,8 +31,10 @@ void Hazard::draw() const {
     Color baseColor;
     if (m_type == HazardType::Radiation)
         baseColor = {255, 60, 60, 255};
-    else
+    else if (m_type == HazardType::Toxic)
         baseColor = {160, 40, 255, 255};
+    else
+        baseColor = {205, 127, 50, 255}; // Bronze
 
     // Pulsing glow based on lifetime
     float pulse = 0.5f + 0.5f * std::sin((float)m_lifetime * 0.05f);
@@ -46,13 +53,15 @@ void Hazard::draw() const {
                     {baseColor.r, baseColor.g, baseColor.b, (unsigned char)(40 + 20 * pulse)});
 
     // Label with type info
-    const char* label = (m_type == HazardType::Radiation) ? "RAD" : "TOX";
+    const char* label = (m_type == HazardType::Radiation) ? "RAD" :
+                        (m_type == HazardType::Toxic) ? "TOX" : "FAM";
     int textW = MeasureText(label, 10);
     DrawText(label, (int)m_position.x - textW / 2, (int)m_position.y - 5, 10,
              {baseColor.r, baseColor.g, baseColor.b, 120});
 
     // Sub-label for effect
-    const char* effect = (m_type == HazardType::Radiation) ? "HP DMG" : "POISON";
+    const char* effect = (m_type == HazardType::Radiation) ? "HP DMG" :
+                         (m_type == HazardType::Toxic) ? "POISON" : "FAMINE";
     int effectW = MeasureText(effect, 7);
     DrawText(effect, (int)m_position.x - effectW / 2, (int)m_position.y + 6, 7,
              {baseColor.r, baseColor.g, baseColor.b, 70});
@@ -62,9 +71,13 @@ Hazard Hazard::spawn(std::mt19937& gen, float worldW, float worldH) {
     std::uniform_real_distribution<float> posX(80.f, worldW - 80.f);
     std::uniform_real_distribution<float> posY(80.f, worldH - 80.f);
     std::uniform_real_distribution<float> radDist(40.f, 80.f);
-    std::uniform_int_distribution<int>    typeDist(0, 1);
+    std::uniform_int_distribution<int>    typeDist(0, 2);
     std::uniform_int_distribution<int>    lifeDist(300, 600);
 
-    HazardType type = (typeDist(gen) == 0) ? HazardType::Radiation : HazardType::Toxic;
-    return Hazard({posX(gen), posY(gen)}, radDist(gen), type, lifeDist(gen));
+    HazardType type = (HazardType)typeDist(gen);
+    float radius = radDist(gen);
+    if (type == HazardType::Famine) {
+        radius *= 2.0f; // 2x the region
+    }
+    return Hazard({posX(gen), posY(gen)}, radius, type, lifeDist(gen));
 }

@@ -200,6 +200,18 @@ void Simulation::update() {
         }
     }
 
+    // ── Remove food inside Famine hazards ───────────────────────
+    m_food.erase(std::remove_if(m_food.begin(), m_food.end(), [&](const Food& f) {
+        for (const auto& h : m_hazards) {
+            if (h->getType() == HazardType::Famine) {
+                float dx = f.position.x - h->getPosition().x;
+                float dy = f.position.y - h->getPosition().y;
+                if (dx*dx + dy*dy < h->getRadius() * h->getRadius()) return true;
+            }
+        }
+        return false;
+    }), m_food.end());
+
     // ── Validate and pair up mates ──────────────────────────────
     // Clean dead mate targets
     for (auto& c : m_population) {
@@ -244,7 +256,7 @@ void Simulation::update() {
     std::vector<int> deadIds;   // creatures killed in fights
 
     for (auto& c : m_population) {
-        c->update(m_worldW, m_worldH, m_food, m_population, m_gen);
+        c->update(m_worldW, m_worldH, m_food, m_population, m_hazards, m_gen);
 
         // ── Hazard interaction ──────────────────────────────
         bool inAnyHazard = false;
@@ -259,7 +271,7 @@ void Simulation::update() {
                             (h->getType() == HazardType::Radiation && c->radImmune);
 
             if (dist < outerR) {
-                if (!isImmune) {
+                if (!isImmune && h->getType() != HazardType::Famine) {
                     // Take damage
                     c->hp -= h->getInstantDamage();
                     c->flashTimer = 8;
@@ -271,7 +283,7 @@ void Simulation::update() {
                 }
 
                 // Step 1: If inside inner ring, FLEE to nearest exit
-                if (dist < innerR && !isImmune) {
+                if (dist < innerR && !isImmune && h->getType() != HazardType::Famine) {
                     inAnyHazard = true;
                     c->fleeing = true;
                     // Flee target: point on outer edge in the direction away from center
@@ -293,6 +305,9 @@ void Simulation::update() {
                     }
                     if (h->getType() == HazardType::Radiation && !c->radImmune && c->hp > 0 && c->hp < c->maxHp * 0.95f) {
                         c->radImmune = true;
+                    }
+                    if (h->getType() == HazardType::Famine && !c->famBadge) {
+                        c->famBadge = true;
                     }
                 }
             }
@@ -445,6 +460,19 @@ void Simulation::update() {
             [](const std::unique_ptr<Hazard>& h) { return h->isExpired(); }),
         m_hazards.end());
 
+    // ── Update input disasters ─────────────────────────────────
+    if (m_disasterCooldown > 0) --m_disasterCooldown;
+
+    for (auto& d : m_disasters) {
+        d.update(m_gen, m_worldW, m_worldH);
+        d.applyDamage(m_population);
+    }
+
+    m_disasters.erase(
+        std::remove_if(m_disasters.begin(), m_disasters.end(),
+            [](const Disaster& d) { return d.isExpired(); }),
+        m_disasters.end());
+
     // ── Death: energy depleted OR hp depleted ───────────────────
     m_population.erase(
         std::remove_if(m_population.begin(), m_population.end(),
@@ -465,6 +493,12 @@ void Simulation::draw() const {
     for (const auto& f : m_food)       f.draw();
     for (const auto& h : m_hazards)    h->draw();
     for (const auto& c : m_population) c->draw();
+    for (const auto& d : m_disasters)  d.draw();
+}
+
+void Simulation::spawnDisaster(Disaster d) {
+    m_disasters.push_back(std::move(d));
+    m_disasterCooldown = Disaster::COOLDOWN_FRAMES;
 }
 
 // ═══════════════════════════════════════════════════════════════

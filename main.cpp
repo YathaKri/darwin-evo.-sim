@@ -4,6 +4,9 @@
 #include <string>
 #include <iostream>
 
+// ── Input mode for disaster placement ───────────────────────────
+enum class InputMode { Normal, PlacingMeteor, PlacingNuke };
+
 int main() {
     // Enable window resizing
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
@@ -34,6 +37,14 @@ int main() {
     camera.offset = (Vector2){ 0.0f, 0.0f };
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
+
+    // ── Disaster placement state ────────────────────────────────
+    InputMode inputMode = InputMode::Normal;
+    std::vector<Vector2> meteorTargets;
+
+    // ── Camera tracking state ───────────────────────────────────
+    bool isTrackingCreature = false;
+    const float TRACK_ZOOM_TARGET = 2.5f;
 
     while (!WindowShouldClose()) {
         // ── Window Resizing & Fullscreen ────────────────────────────
@@ -94,6 +105,11 @@ int main() {
             delta.y = delta.y * -1.0f / camera.zoom;
             camera.target.x += delta.x;
             camera.target.y += delta.y;
+            
+            // Interrupt tracking if user pans manually
+            if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
+                isTrackingCreature = false;
+            }
         }
 
         float wheel = GetMouseWheelMove();
@@ -105,6 +121,30 @@ int main() {
             camera.zoom += (wheel * zoomIncrement);
             if (camera.zoom < 0.1f) camera.zoom = 0.1f;
             if (camera.zoom > 4.0f) camera.zoom = 4.0f;
+            
+            // Interrupt tracking if user zooms manually
+            isTrackingCreature = false;
+        }
+
+        // ── Right-click / ESC: cancel placement or deselect ─────────
+        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+            if (inputMode != InputMode::Normal) {
+                inputMode = InputMode::Normal;
+                meteorTargets.clear();
+                showStatus("Disaster placement cancelled");
+            } else {
+                selectedCreatureId = -1;
+                selectedCreature = nullptr;
+                isTrackingCreature = false;
+            }
+        }
+
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            if (inputMode != InputMode::Normal) {
+                inputMode = InputMode::Normal;
+                meteorTargets.clear();
+                showStatus("Disaster placement cancelled");
+            }
         }
 
         // ── Click-to-select organism or UI ──────────────────────────
@@ -114,42 +154,25 @@ int main() {
             // Check UI panel clicks
             if (mouse.x >= (float)panelX) {
                 int lx = panelX + 12;
-                // These Y coordinates must match where they are drawn in UI.cpp
-                // Sim Speed buttons Y ~ 280-320 (it's dynamic but let's approximate based on UI.cpp structure)
-                // Actually, since UI is drawn dynamically, we need robust hitboxes.
-                // Let's reverse-engineer the Y from UI.cpp:
-                // Base ly starts at 10.
-                // Title (16+8) = 34.
-                // Playback (14+9+4+8+8) = 77.
-                // Core stats (6 blocks * 28) = 245.
-                // Avg stats (6+ 3 blocks * 24) = 323.
-                // Graph (6+10+50+54) = 443.
-                // Selected (varies heavily based on organism stats).
-                // Wait, controls are drawn AFTER the selected organism info in UI.cpp.
-                // This means their Y coordinate changes depending on the selected organism.
-                // Instead of guessing, we can iterate to see if mouse clicked on the right side panel and check Y manually.
-                // But wait, the controls are now ABOVE keybindings. Let's just find the approximate Y from bottom.
-                // Keybindings height = 6+10+10+14 = 40.
-                // Controls height = 6 + 12+20 (speed) + 12+20 (food) = 70.
-                // So controls start at around screenH - 110.
-                // Let's use screenH - 110 as a base for click detection.
-                int controlsY = screenH - 130; 
-                
-                // Sim Speed (5 buttons)
-                int sY = controlsY + 18;
+
+                // ── Controls base Y (must match UI.cpp layout) ──────
+                int controlsBaseY = screenH - 215;
+
+                // Sim Speed buttons: offset +6 (divider) +12 (label) = +18
+                int sY = controlsBaseY + 18;
                 if (mouse.y >= sY && mouse.y <= sY + 14) {
-                    int btns[] = {1, 5, 10, 15, 20};
+                    int sBtns[] = {1, 5, 10, 15, 20};
                     for (int i = 0; i < 5; i++) {
                         int bx = lx + i * 28;
                         if (mouse.x >= bx && mouse.x <= bx + 24) {
-                            sim.setSimSpeedMult(btns[i]);
+                            sim.setSimSpeedMult(sBtns[i]);
                             showStatus("Simulation Speed updated");
                         }
                     }
                 }
                 
-                // Food Drop Rate (5 buttons)
-                int fY = controlsY + 50;
+                // Food Drop Rate buttons: offset +18 +20 +12 = +50
+                int fY = controlsBaseY + 50;
                 if (mouse.y >= fY && mouse.y <= fY + 14) {
                     int fBtns[] = {1, 2, 5, 10, 20};
                     for (int i = 0; i < 5; i++) {
@@ -160,37 +183,113 @@ int main() {
                         }
                     }
                 }
-            } 
-            else {
-                // Click in simulation canvas
-                Vector2 worldMouse = GetScreenToWorld2D(mouse, camera);
-                selectedCreatureId = -1;
-                selectedCreature = nullptr;
-                float closestDist = 9999.f;
 
-                for (const auto& c : sim.getCreatures()) {
-                    float dx = worldMouse.x - c->position.x;
-                    float dy = worldMouse.y - c->position.y;
-                    float dist = std::sqrt(dx * dx + dy * dy);
-                    float clickRadius = c->radius + 6.f;
-                    if (dist < clickRadius && dist < closestDist) {
-                        closestDist = dist;
-                        selectedCreatureId = c->id;
+                // Disaster buttons: offset +50 +20 +6 (divider) +6 +12 (label) = +94
+                int dY = controlsBaseY + 94;
+                if (mouse.y >= dY && mouse.y <= dY + 28) {
+                    bool canSpawn = sim.canSpawnDisaster() && inputMode == InputMode::Normal;
+                    if (canSpawn) {
+                        for (int i = 0; i < 3; i++) {
+                            int bx = lx + i * 50;
+                            if (mouse.x >= bx && mouse.x <= bx + 44) {
+                                if (i == 0) {
+                                    // METEOR: enter placement mode
+                                    inputMode = InputMode::PlacingMeteor;
+                                    meteorTargets.clear();
+                                    showStatus("METEOR: Click 3 locations on the map");
+                                } else if (i == 1) {
+                                    // VOLCANO: spawn immediately at random position
+                                    sim.spawnDisaster(Disaster::createVolcano(
+                                        sim.getRng(), sim.getWorldW(), sim.getWorldH()));
+                                    showStatus("Volcano spawned! Eruption in 5 seconds...");
+                                } else if (i == 2) {
+                                    // NUKE: enter placement mode
+                                    inputMode = InputMode::PlacingNuke;
+                                    showStatus("NUKE: Click to mark ground zero");
+                                }
+                                break;
+                            }
+                        }
+                    } else if (inputMode != InputMode::Normal) {
+                        showStatus("Finish current placement first!");
+                    } else {
+                        showStatus("Disaster on cooldown!");
+                    }
+                }
+
+            } else {
+                // ── Click in simulation canvas ──────────────────────
+                Vector2 worldMouse = GetScreenToWorld2D(mouse, camera);
+
+                if (inputMode == InputMode::PlacingMeteor) {
+                    // Place meteor target
+                    meteorTargets.push_back(worldMouse);
+                    if ((int)meteorTargets.size() >= 3) {
+                        sim.spawnDisaster(Disaster::createMeteor(meteorTargets));
+                        meteorTargets.clear();
+                        inputMode = InputMode::Normal;
+                        showStatus("Meteor strike incoming!");
+                    } else {
+                        char msgBuf[64];
+                        std::snprintf(msgBuf, sizeof(msgBuf), "METEOR: Click %d more location(s)",
+                                      3 - (int)meteorTargets.size());
+                        showStatus(msgBuf);
+                    }
+
+                } else if (inputMode == InputMode::PlacingNuke) {
+                    // Place nuke target
+                    sim.spawnDisaster(Disaster::createNuke(worldMouse));
+                    inputMode = InputMode::Normal;
+                    showStatus("Nuclear strike incoming! 5 seconds to detonation!");
+
+                } else {
+                    // Normal click-to-select creature
+                    selectedCreatureId = -1;
+                    selectedCreature = nullptr;
+                    float closestDist = 9999.f;
+
+                    for (const auto& c : sim.getCreatures()) {
+                        float dx = worldMouse.x - c->position.x;
+                        float dy = worldMouse.y - c->position.y;
+                        float dist = std::sqrt(dx * dx + dy * dy);
+                        float clickRadius = c->radius + 6.f;
+                        if (dist < clickRadius && dist < closestDist) {
+                            closestDist = dist;
+                            selectedCreatureId = c->id;
+                        }
+                    }
+                    
+                    if (selectedCreatureId != -1) {
+                        isTrackingCreature = true;
+                    } else {
+                        isTrackingCreature = false;
                     }
                 }
             }
         }
 
-        // Right-click or ESC to deselect
-        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsKeyPressed(KEY_ESCAPE)) {
-            selectedCreatureId = -1;
-            selectedCreature = nullptr;
-        }
-
         // Refresh the pointer each frame (creature may have died)
         if (selectedCreatureId != -1) {
             selectedCreature = sim.findCreature(selectedCreatureId);
-            if (!selectedCreature) selectedCreatureId = -1;  // died, deselect
+            if (!selectedCreature) {
+                selectedCreatureId = -1;  // died, deselect
+                isTrackingCreature = false;
+            }
+        }
+        
+        // ── Camera Tracking Update ──────────────────────────────────
+        if (isTrackingCreature && selectedCreature) {
+            // Smoothly move target to creature's position
+            float lerpSpeed = 0.1f;
+            camera.target.x += (selectedCreature->position.x - camera.target.x) * lerpSpeed;
+            camera.target.y += (selectedCreature->position.y - camera.target.y) * lerpSpeed;
+            
+            // Set offset to center of screen (excluding UI panel)
+            camera.offset.x = (float)panelX / 2.0f;
+            camera.offset.y = (float)screenH / 2.0f;
+            
+            // Smoothly zoom in
+            camera.zoom += (TRACK_ZOOM_TARGET - camera.zoom) * lerpSpeed;
         }
 
         // Status timer
@@ -257,13 +356,57 @@ int main() {
             DrawText(label, (int)pos.x - textW / 2, (int)pos.y - (int)r - 16, 10, {0, 255, 120, 200});
         }
 
+        // ── Draw disaster placement previews ────────────────────────
+        if (inputMode == InputMode::PlacingMeteor) {
+            Vector2 worldMouse = GetScreenToWorld2D(GetMousePosition(), camera);
+
+            // Preview circle at cursor
+            float curPulse = 0.5f + 0.5f * std::sin((float)GetTime() * 4.f);
+            DrawCircleLines((int)worldMouse.x, (int)worldMouse.y, 100.f,
+                            {255, 100, 30, (unsigned char)(80 + 60 * curPulse)});
+            DrawCircleV(worldMouse, 4.f, {255, 130, 40, 200});
+
+            // Draw already-placed targets
+            for (const auto& t : meteorTargets) {
+                DrawCircleV(t, 5.f, {255, 100, 30, 220});
+                DrawCircleLines((int)t.x, (int)t.y, 100.f, {255, 80, 20, 80});
+                DrawCircleLines((int)t.x, (int)t.y, 6.f, {255, 150, 50, 160});
+            }
+
+        } else if (inputMode == InputMode::PlacingNuke) {
+            Vector2 worldMouse = GetScreenToWorld2D(GetMousePosition(), camera);
+            float curPulse = 0.5f + 0.5f * std::sin((float)GetTime() * 3.f);
+
+            // Outer damage ring
+            DrawCircleLines((int)worldMouse.x, (int)worldMouse.y, 250.f,
+                            {255, 200, 0, (unsigned char)(50 + 40 * curPulse)});
+            // Inner kill zone
+            DrawCircleLines((int)worldMouse.x, (int)worldMouse.y, 200.f,
+                            {255, 50, 20, (unsigned char)(60 + 50 * curPulse)});
+            // Center crosshair
+            DrawLineEx({worldMouse.x - 10, worldMouse.y}, {worldMouse.x + 10, worldMouse.y},
+                       1.5f, {255, 200, 0, 180});
+            DrawLineEx({worldMouse.x, worldMouse.y - 10}, {worldMouse.x, worldMouse.y + 10},
+                       1.5f, {255, 200, 0, 180});
+            DrawCircleV(worldMouse, 3.f, {255, 220, 50, 220});
+        }
+
         EndMode2D();
+
+        // Build disaster UI info
+        DisasterUIInfo dInfo;
+        dInfo.cooldownFrames     = sim.getDisasterCooldown();
+        dInfo.maxCooldown        = Disaster::COOLDOWN_FRAMES;
+        dInfo.inputMode          = (inputMode == InputMode::PlacingMeteor) ? 1 :
+                                   (inputMode == InputMode::PlacingNuke)   ? 2 : 0;
+        dInfo.meteorTargetsPlaced = (int)meteorTargets.size();
 
         // Draw UI overlay panel (dynamically positioned based on window size)
         ui.draw(sim.getStats(), mode, sim.historySize(),
                 selectedCreature,
                 statusMsg.empty() ? nullptr : statusMsg.c_str(),
-                panelX, screenH);
+                panelX, screenH,
+                dInfo);
 
         EndDrawing();
     }

@@ -3,7 +3,7 @@
 #include <random>
 
 // ── Hazard types ────────────────────────────────────────────────
-enum class HazardType { Radiation, Toxic };
+enum class HazardType { Radiation, Toxic, Famine };
 
 // ── Hazard: environmental danger zone (inherits Entity) ─────────
 class Hazard : public Entity {

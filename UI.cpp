@@ -60,7 +60,8 @@ void UI::drawGraph(int x, int y, int w, int h) const {
 void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
               const Creature* selected,
               const char* statusMsg,
-              int panelX, int screenH) const {
+              int panelX, int screenH,
+              const DisasterUIInfo& disasterInfo) const {
     int px = panelX;
     int pw = PANEL_W;
 
@@ -260,16 +261,58 @@ void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
             ly += 12;
         }
 
-        // Immunity badges
-        if (selected->toxImmune || selected->radImmune) {
+        // Immunity badges (vector icons)
+        if (selected->toxImmune || selected->radImmune || selected->famBadge) {
             DrawText("BADGES:", lx, ly, 7, Color{90, 90, 120, 255});
             ly += 10;
             if (selected->toxImmune) {
-                DrawText("\xe2\x97\x86 TOX Immune (Silver)", lx, ly, 9, Color{192, 192, 210, 255});
+                // Draw silver diamond badge
+                float bx = lx + 4.f;
+                float by = ly + 4.f;
+                float bs = 3.f;
+                Vector2 top   = {bx,      by - bs};
+                Vector2 right = {bx + bs, by};
+                Vector2 bot   = {bx,      by + bs};
+                Vector2 left  = {bx - bs, by};
+                DrawTriangle(top, left, bot, Color{192, 192, 210, 255});
+                DrawTriangle(top, bot, right, Color{192, 192, 210, 255});
+                DrawText("  TOX Immune (Silver)", lx + 8, ly, 9, Color{192, 192, 210, 255});
                 ly += 12;
             }
             if (selected->radImmune) {
-                DrawText("\xe2\x98\x85 RAD Immune (Gold)", lx, ly, 9, Color{255, 215, 0, 255});
+                // Draw gold star badge
+                float bx = lx + 4.f;
+                float by = ly + 4.f;
+                float bs = 3.5f;
+                Color gold = {255, 215, 0, 255};
+                for (int i = 0; i < 5; i++) {
+                    float a1 = (2.f * 3.14159f / 5.f) * i - 3.14159f / 2.f;
+                    float a2 = (2.f * 3.14159f / 5.f) * (i + 1) - 3.14159f / 2.f;
+                    float aMid = (a1 + a2) / 2.f;
+                    Vector2 outer1 = {bx + bs * std::cos(a1), by + bs * std::sin(a1)};
+                    Vector2 outer2 = {bx + bs * std::cos(a2), by + bs * std::sin(a2)};
+                    Vector2 inner  = {bx + bs * 0.4f * std::cos(aMid), by + bs * 0.4f * std::sin(aMid)};
+                    DrawTriangle({bx, by}, outer1, inner, gold);
+                    DrawTriangle({bx, by}, inner, outer2, gold);
+                }
+                DrawText("  RAD Immune (Gold)", lx + 8, ly, 9, Color{255, 215, 0, 255});
+                ly += 12;
+            }
+            if (selected->famBadge) {
+                // Draw bronze hexagon badge (solid color)
+                float bx = lx + 4.f;
+                float by = ly + 4.f;
+                float bs = 3.5f;
+                Color bronze = {205, 127, 50, 255};
+                for (int i = 0; i < 6; i++) {
+                    float a1 = (2.f * 3.14159f / 6.f) * i - 3.14159f / 2.f;
+                    float a2 = (2.f * 3.14159f / 6.f) * (i + 1) - 3.14159f / 2.f;
+                    Vector2 outer1 = {bx + bs * std::cos(a1), by + bs * std::sin(a1)};
+                    Vector2 outer2 = {bx + bs * std::cos(a2), by + bs * std::sin(a2)};
+                    DrawTriangle({bx, by}, outer1, outer2, bronze);
+                    DrawLineV(outer1, outer2, bronze);
+                }
+                DrawText("  FAM Survivor (Bronze)", lx + 8, ly, 9, Color{205, 127, 50, 255});
                 ly += 12;
             }
         }
@@ -322,8 +365,14 @@ void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
         ly += 12;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  BOTTOM SECTION (fixed position from bottom)
+    // ═══════════════════════════════════════════════════════════
+
+    ly = screenH - 215;
+
     // ── Controls ────────────────────────────────────────────────
-    ly = screenH - 130;
+    DrawRectangle(px + 1, ly - 4, pw - 1, screenH - ly + 4, Color{10, 10, 18, 245});
     DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
     ly += 6;
 
@@ -353,14 +402,112 @@ void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
     }
     ly += 20;
 
+    // ── DISASTERS SECTION ───────────────────────────────────────
+    DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
+    ly += 6;
+
+    DrawText("DISASTERS", lx, ly, 8, Color{255, 80, 50, 255});
+    ly += 12;
+
+    bool canSpawn = (disasterInfo.cooldownFrames <= 0 && disasterInfo.inputMode == 0);
+
+    // 3 disaster buttons: 44x28 each, 6px gap
+    struct DisBtn { const char* label; Color activeColor; };
+    DisBtn dBtns[3] = {
+        {"MET",  {200, 100, 30, 255}},
+        {"VOL",  {200, 50,  20, 255}},
+        {"NUK",  {200, 180, 0,  255}},
+    };
+
+    for (int i = 0; i < 3; i++) {
+        int bx = lx + i * 50;
+        int by = ly;
+
+        Color bgCol  = canSpawn ? dBtns[i].activeColor : Color{35, 35, 50, 255};
+        Color txtCol = canSpawn ? Color{255, 255, 255, 255} : Color{80, 80, 100, 255};
+
+        // Highlight if this disaster's placement mode is active
+        if ((i == 0 && disasterInfo.inputMode == 1) ||
+            (i == 2 && disasterInfo.inputMode == 2)) {
+            bgCol = {255, 255, 100, 255};
+            txtCol = {0, 0, 0, 255};
+        }
+
+        DrawRectangle(bx, by, 44, 28, bgCol);
+        DrawRectangleLines(bx, by, 44, 28, Color{(unsigned char)(bgCol.r/2 + 60),
+                                                   (unsigned char)(bgCol.g/2 + 60),
+                                                   (unsigned char)(bgCol.b/2 + 60), 200});
+
+        // Draw icons
+        float cx = bx + 22.f;
+        float cy = by + 11.f;
+
+        if (i == 0) {
+            // METEOR: Earth icon (blue/green sphere)
+            DrawCircleV({cx, cy}, 8, {30, 80, 180, canSpawn ? (unsigned char)220 : (unsigned char)80});
+            DrawCircleV({cx - 2, cy - 2}, 4, {40, 160, 60, canSpawn ? (unsigned char)200 : (unsigned char)60});
+            DrawCircleV({cx + 3, cy + 1}, 2.5f, {40, 140, 50, canSpawn ? (unsigned char)180 : (unsigned char)50});
+            DrawCircleLines((int)cx, (int)cy, 8, {60, 120, 220, canSpawn ? (unsigned char)160 : (unsigned char)50});
+        } else if (i == 1) {
+            // VOLCANO: Mountain triangle + red top
+            Vector2 vtop   = {cx, cy - 8};
+            Vector2 vleft  = {cx - 10, cy + 7};
+            Vector2 vright = {cx + 10, cy + 7};
+            Color mtnCol = canSpawn ? Color{120, 65, 30, 255} : Color{50, 35, 20, 200};
+            DrawTriangle(vtop, vleft, vright, mtnCol);
+            DrawCircleV({cx, cy - 6}, 3, canSpawn ? Color{255, 80, 20, 220} : Color{100, 40, 20, 100});
+            DrawLineV(vtop, vleft, canSpawn ? Color{160, 90, 45, 200} : Color{60, 40, 20, 100});
+            DrawLineV(vleft, vright, canSpawn ? Color{160, 90, 45, 200} : Color{60, 40, 20, 100});
+            DrawLineV(vright, vtop, canSpawn ? Color{160, 90, 45, 200} : Color{60, 40, 20, 100});
+        } else {
+            // NUKE: Mushroom cloud
+            unsigned char a = canSpawn ? (unsigned char)220 : (unsigned char)70;
+            DrawCircleV({cx, cy - 3}, 6, {255, 200, 0, a});
+            DrawCircleV({cx - 3, cy - 1}, 3.5f, {255, 180, 0, (unsigned char)(a * 0.8f)});
+            DrawCircleV({cx + 3, cy - 1}, 3.5f, {255, 180, 0, (unsigned char)(a * 0.8f)});
+            DrawRectangle((int)(cx - 2), (int)(cy + 1), 4, 7, {220, 160, 0, (unsigned char)(a * 0.8f)});
+            DrawCircleV({cx, cy + 7}, 4, {200, 140, 30, (unsigned char)(a * 0.5f)});
+        }
+
+        // Label below icon
+        int tw = MeasureText(dBtns[i].label, 7);
+        DrawText(dBtns[i].label, bx + 22 - tw / 2, by + 21, 7, txtCol);
+    }
+    ly += 32;
+
+    // Cooldown bar
+    if (disasterInfo.cooldownFrames > 0) {
+        DrawText("COOLDOWN", lx, ly, 7, Color{90, 90, 120, 255});
+        ly += 9;
+        float cdRatio = (float)disasterInfo.cooldownFrames / (float)disasterInfo.maxCooldown;
+        DrawRectangle(lx, ly, pw - 24, 4, Color{30, 30, 45, 255});
+        DrawRectangle(lx, ly, (int)((pw - 24) * cdRatio), 4, Color{255, 80, 50, 200});
+        ly += 8;
+    } else if (disasterInfo.inputMode != 0) {
+        // Placement mode indicator
+        const char* modeText = "";
+        if (disasterInfo.inputMode == 1) {
+            std::snprintf(buf, sizeof(buf), "METEOR: %d/3 placed", disasterInfo.meteorTargetsPlaced);
+            modeText = buf;
+        } else if (disasterInfo.inputMode == 2) {
+            modeText = "NUKE: Click target";
+        }
+        DrawText(modeText, lx, ly, 7, Color{255, 255, 100, 255});
+        ly += 10;
+    } else {
+        ly += 4;
+    }
+
     // ── Keybindings ─────────────────────────────────────────────
     DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
     ly += 6;
-    DrawText("[SPC] pause  [</> ] rew/ff", lx, ly, 7, Color{60, 60, 90, 255});
+    DrawText("[SPC] pause  [</>] rew/ff", lx, ly, 7, Color{60, 60, 90, 255});
     ly += 10;
     DrawText("[S]ave [L]oad [G]report",   lx, ly, 7, Color{60, 60, 90, 255});
     ly += 10;
     DrawText("[F11] fullscreen  [ESC]",   lx, ly, 7, Color{60, 60, 90, 255});
+    ly += 10;
+    DrawText("[RMB] cancel placement",    lx, ly, 7, Color{60, 60, 90, 255});
     ly += 14;
 
     // ── Status message (on simulation canvas, not panel) ────────

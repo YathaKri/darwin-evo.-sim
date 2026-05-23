@@ -5,6 +5,14 @@
 #include <vector>
 #include <string>
 
+// ── Info passed from main.cpp for disaster UI rendering ─────────
+struct DisasterUIInfo {
+    int cooldownFrames    = 0;   // frames remaining (0 = ready)
+    int maxCooldown       = 600; // 10 seconds
+    int inputMode         = 0;   // 0=Normal, 1=PlacingMeteor, 2=PlacingNuke
+    int meteorTargetsPlaced = 0; // 0-3 for meteor placement progress
+};
+
 class UI {
 public:
     static constexpr int   PANEL_W  = 180;
@@ -18,7 +26,8 @@ public:
     void draw(const SimStats& stats, PlayMode mode, int historyFrames,
               const Creature* selected,
               const char* statusMsg,
-              int panelX, int screenH) const;
+              int panelX, int screenH,
+              const DisasterUIInfo& disasterInfo) const;
 
 private:
     std::vector<int> m_popHistory;

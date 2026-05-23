@@ -175,10 +175,10 @@ g++ --version
 
 1. Open the project folder in VS Code (`File → Open Folder`).
 2. Press **`Ctrl+Shift+B`** to build — this uses the pre-configured task in `.vscode/tasks.json`.
-3. If the build succeeds, you'll see `Evolution.exe` appear in the project directory.
+3. If the build succeeds, you'll see `darwin_sim.exe` appear in the project directory.
 4. Run it by either:
-   - Opening a terminal in VS Code (`` Ctrl+` ``) and typing `.\Evolution.exe`
-   - Or double-clicking `Evolution.exe` in File Explorer.
+   - Opening a terminal in VS Code (`` Ctrl+` ``) and typing `.\darwin_sim.exe`
+   - Or double-clicking `darwin_sim.exe` in File Explorer.
 
 ### Option B: Command line (MSYS2 UCRT64 terminal)
 
@@ -186,7 +186,7 @@ Navigate to the project folder and run:
 
 ```bash
 g++ -g main.cpp Simulation.cpp Creature.cpp Food.cpp UI.cpp \
-    -o Evolution.exe \
+    -o darwin_sim.exe \
     -I C:/msys64/ucrt64/include \
     -L C:/msys64/ucrt64/lib \
     -lraylib -lopengl32 -lgdi32 -lwinmm
@@ -195,7 +195,7 @@ g++ -g main.cpp Simulation.cpp Creature.cpp Food.cpp UI.cpp \
 Then run:
 
 ```bash
-./Evolution.exe
+./darwin_sim.exe
 ```
 
 ### ⚠️ Troubleshooting
