@@ -442,6 +442,14 @@ This project was built as a showcase of modern C++ and object-oriented design:
 
 ---
 
+## 👥 Contributors
+ 
+- **Yatharth**
+- **Tanay**
+- **Yashverm**
+
+---
+
 ## 📝 License
 
 This project is provided for educational purposes. Feel free to use, modify, and learn from it.
