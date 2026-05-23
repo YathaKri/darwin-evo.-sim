@@ -81,11 +81,62 @@ int main() {
             showStatus("Generated simulation_report.txt");
         }
 
-        // ── Click-to-select organism ────────────────────────────────
+        // ── Click-to-select organism or UI ──────────────────────────
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             Vector2 mouse = GetMousePosition();
-            // Only detect clicks in the simulation canvas (not the UI panel)
-            if (mouse.x < (float)panelX) {
+            
+            // Check UI panel clicks
+            if (mouse.x >= (float)panelX) {
+                int lx = panelX + 12;
+                // These Y coordinates must match where they are drawn in UI.cpp
+                // Sim Speed buttons Y ~ 280-320 (it's dynamic but let's approximate based on UI.cpp structure)
+                // Actually, since UI is drawn dynamically, we need robust hitboxes.
+                // Let's reverse-engineer the Y from UI.cpp:
+                // Base ly starts at 10.
+                // Title (16+8) = 34.
+                // Playback (14+9+4+8+8) = 77.
+                // Core stats (6 blocks * 28) = 245.
+                // Avg stats (6+ 3 blocks * 24) = 323.
+                // Graph (6+10+50+54) = 443.
+                // Selected (varies heavily based on organism stats).
+                // Wait, controls are drawn AFTER the selected organism info in UI.cpp.
+                // This means their Y coordinate changes depending on the selected organism.
+                // Instead of guessing, we can iterate to see if mouse clicked on the right side panel and check Y manually.
+                // But wait, the controls are now ABOVE keybindings. Let's just find the approximate Y from bottom.
+                // Keybindings height = 6+10+10+14 = 40.
+                // Controls height = 6 + 12+20 (speed) + 12+20 (food) = 70.
+                // So controls start at around screenH - 110.
+                // Let's use screenH - 110 as a base for click detection.
+                int controlsY = screenH - 130; 
+                
+                // Sim Speed (5 buttons)
+                int sY = controlsY + 18;
+                if (mouse.y >= sY && mouse.y <= sY + 14) {
+                    int btns[] = {1, 5, 10, 15, 20};
+                    for (int i = 0; i < 5; i++) {
+                        int bx = lx + i * 28;
+                        if (mouse.x >= bx && mouse.x <= bx + 24) {
+                            sim.setSimSpeedMult(btns[i]);
+                            showStatus("Simulation Speed updated");
+                        }
+                    }
+                }
+                
+                // Food Drop Rate (5 buttons)
+                int fY = controlsY + 50;
+                if (mouse.y >= fY && mouse.y <= fY + 14) {
+                    int fBtns[] = {1, 2, 5, 10, 20};
+                    for (int i = 0; i < 5; i++) {
+                        int bx = lx + i * 28;
+                        if (mouse.x >= bx && mouse.x <= bx + 24) {
+                            sim.setFoodDropMult(fBtns[i]);
+                            showStatus("Food Drop Rate updated");
+                        }
+                    }
+                }
+            } 
+            else {
+                // Click in simulation canvas
                 selectedCreatureId = -1;
                 selectedCreature = nullptr;
                 float closestDist = 9999.f;
@@ -94,7 +145,6 @@ int main() {
                     float dx = mouse.x - c->position.x;
                     float dy = mouse.y - c->position.y;
                     float dist = std::sqrt(dx * dx + dy * dy);
-                    // Click within the creature's body or a generous click area
                     float clickRadius = c->radius + 6.f;
                     if (dist < clickRadius && dist < closestDist) {
                         closestDist = dist;
@@ -126,13 +176,17 @@ int main() {
         // ── Simulation Logic Update ─────────────────────────────────
         
         if (mode == PlayMode::Playing) {
-            sim.update();
+            int speed = sim.getSimSpeedMult();
+            for (int i = 0; i < speed; ++i) {
+                sim.update();
+            }
             ui.update(sim.getStats());
         } 
         else if (mode == PlayMode::FastForward) {
-            // Run twice per frame
-            sim.update();
-            sim.update();
+            int speed = sim.getSimSpeedMult() * 2;
+            for (int i = 0; i < speed; ++i) {
+                sim.update();
+            }
             ui.update(sim.getStats());
         } 
         else if (mode == PlayMode::Rewinding) {

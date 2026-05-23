@@ -51,12 +51,47 @@ struct Creature : public Entity {
     float dotDamage    = 0.f;     // damage per frame from lingering poison
     int   dotTimer     = 0;       // frames remaining for DOT
 
+    // ── Big Food Buff ──
+    int   bigFoodTimer = 0;       // frames remaining for infinite energy from big food
+
+    // ── Reproduction Cooldown ──
+    int   reproductionCooldown = 0; // frames before allowed to reproduce again
+
     // ── Trail: stores last N positions for motion-trail rendering ──
     std::vector<Vector2> trail;
     static constexpr int   TRAIL_LEN   = 10;
 
     static constexpr float MAX_SPEED   = 4.8f;    // velocity magnitude cap
     static constexpr float STEER_FORCE = 0.12f;  // steering strength
+
+    // ── Mutation system ──
+    struct MutationStack {
+        // (a) Speed: additive sum of random 10-40% boosts, 100% inherit
+        int   speedCount   = 0;
+        float speedBonus   = 0.f;    // total % increase
+
+        // (b) Vision: additive 5-15% per stack, 100% inherit, cap 1000%
+        int   visionCount  = 0;
+        float visionBonus  = 0.f;    // total % increase
+
+        // (c) Stamina: -5% consumption, +5% gain per stack, 100% inherit
+        int   staminaCount = 0;
+
+        // (d) Size: +10% multiplicative per stack, 50% inherit
+        int   sizeCount    = 0;
+
+        // (e) Bioluminescence: 10% chance on any mutation, 70% inherit
+        bool  hasBio       = false;
+        Color neonColor    = {0, 255, 0, 255};
+        int   bioCount     = 0;
+
+        bool hasMutations() const {
+            return speedCount > 0 || visionCount > 0 || staminaCount > 0 ||
+                   sizeCount > 0 || hasBio;
+        }
+    };
+
+    MutationStack mutations;
 
     // ── Sync expressed traits from genome ──
     void applyGenome();

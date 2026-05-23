@@ -194,10 +194,19 @@ void Simulation::update() {
 
     // ── Food regrowth ───────────────────────────────────────────
     std::uniform_int_distribution<int> chance(1, 100);
-    if (chance(m_gen) <= 10 && (int)m_food.size() < 200)
-        m_food.push_back(Food::spawn(m_gen, m_worldW, m_worldH));
+    for (int i = 0; i < m_foodDropMult; i++) {
+        if (chance(m_gen) <= 10 && (int)m_food.size() < 200 * m_foodDropMult) {
+            m_food.push_back(Food::spawn(m_gen, m_worldW, m_worldH));
+        }
+    }
 
     // ── Validate and pair up mates ──────────────────────────────
+    // Clean dead mate targets
+    for (auto& c : m_population) {
+        if (c->mateTargetId != -1) {
+            if (!findCreature(c->mateTargetId)) c->mateTargetId = -1;
+        }
+    }
     for (auto& c : m_population) {
         if (c->energy < 160.f) {
             c->mateTargetId = -1;
@@ -237,22 +246,61 @@ void Simulation::update() {
     for (auto& c : m_population) {
         c->update(m_worldW, m_worldH, m_food, m_population, m_gen);
 
-        // ── Hazard interaction ──────────────────────────────────
+        // ── Hazard interaction ──────────────────────────────
+        bool inAnyHazard = false;
         for (const auto& h : m_hazards) {
             float dx   = c->position.x - h->getPosition().x;
             float dy   = c->position.y - h->getPosition().y;
             float dist = std::sqrt(dx * dx + dy * dy);
-            if (dist < h->getRadius()) {
-                // Instant HP damage
-                c->hp -= h->getInstantDamage();
-                c->flashTimer = 8;   // white flash
+            float outerR = h->getRadius();
+            float innerR = outerR * 0.7f;
 
-                // TOX applies lingering DOT (refreshes on each contact)
-                if (h->getType() == HazardType::Toxic) {
-                    c->dotDamage  = h->getDotDamage();
-                    c->dotTimer   = h->getDotDuration();
+            bool isImmune = (h->getType() == HazardType::Toxic && c->toxImmune) ||
+                            (h->getType() == HazardType::Radiation && c->radImmune);
+
+            if (dist < outerR) {
+                if (!isImmune) {
+                    // Take damage
+                    c->hp -= h->getInstantDamage();
+                    c->flashTimer = 8;
+
+                    if (h->getType() == HazardType::Toxic) {
+                        c->dotDamage = h->getDotDamage();
+                        c->dotTimer  = h->getDotDuration();
+                    }
+                }
+
+                // Step 1: If inside inner ring, FLEE to nearest exit
+                if (dist < innerR && !isImmune) {
+                    inAnyHazard = true;
+                    c->fleeing = true;
+                    // Flee target: point on outer edge in the direction away from center
+                    if (dist > 0.001f) {
+                        c->fleeTarget.x = h->getPosition().x + (dx / dist) * (outerR + 10.f);
+                        c->fleeTarget.y = h->getPosition().y + (dy / dist) * (outerR + 10.f);
+                    } else {
+                        // Directly on center — pick random direction
+                        c->fleeTarget.x = h->getPosition().x + outerR + 10.f;
+                        c->fleeTarget.y = h->getPosition().y;
+                    }
+                }
+            } else {
+                // Step 2: Just exited a hazard? Grant immunity as a survivor
+                // Check if creature was recently damaged by this type
+                if (dist < outerR + 15.f && dist > outerR) {
+                    if (h->getType() == HazardType::Toxic && !c->toxImmune && c->hp > 0 && c->hp < c->maxHp * 0.95f) {
+                        c->toxImmune = true;
+                    }
+                    if (h->getType() == HazardType::Radiation && !c->radImmune && c->hp > 0 && c->hp < c->maxHp * 0.95f) {
+                        c->radImmune = true;
+                    }
                 }
             }
+        }
+
+        // Clear flee flag if no longer inside any hazard inner ring
+        if (!inAnyHazard && c->fleeing) {
+            c->fleeing = false;
         }
 
         // ── Eat food ────────────────────────────────────────────
@@ -261,7 +309,14 @@ void Simulation::update() {
             float dy   = c->position.y - it->position.y;
             float dist = std::sqrt(dx * dx + dy * dy);
             if (dist < c->radius + it->radius) {
-                c->energy += 40.f;
+                if (it->isBig) {
+                    c->bigFoodTimer = 300; // 5 seconds of 100% full food buff
+                    c->energy = 200.f;     // instantly fill up to max
+                } else {
+                    // (c) Stamina mutation: +5% extra energy gain per stack
+                    float gainMult = 1.f + (c->mutations.staminaCount * 0.05f);
+                    c->energy += 40.f * gainMult;
+                }
                 it = m_food.erase(it);
             } else {
                 ++it;
@@ -312,8 +367,19 @@ void Simulation::update() {
                 bool canReproduce = (a->energy >= 120.f && b->energy >= 120.f);
                 bool superHighEnergy = (a->energy >= 160.f && b->energy >= 160.f); // 80% of 200
 
+                // Step 3: Badge holders (immune organisms) reproduce at 40% energy
+                bool badgeReproduce = (a->hasBadge() || b->hasBadge()) &&
+                                      (a->energy >= 80.f && b->energy >= 80.f);
+
+                // Check 5-second reproduction cooldown (300 frames)
+                if (a->reproductionCooldown > 0 || b->reproductionCooldown > 0) {
+                    canReproduce = false;
+                    superHighEnergy = false;
+                    badgeReproduce = false;
+                }
+
                 // 100% chance to reproduce if >80% energy, ignoring species color gap
-                if (superHighEnergy || (canReproduce && colorDiff < 200)) {
+                if (superHighEnergy || badgeReproduce || (canReproduce && colorDiff < 200)) {
                     // ── REPRODUCE ───────────────────────────────
                     Creature baby = a->reproduce(m_gen, *b);
                     baby.id = m_nextCreatureId++;
@@ -321,6 +387,10 @@ void Simulation::update() {
                     setCooldown(a->id, b->id, 120);
                     setCooldown(a->id, baby.id, 120);
                     setCooldown(b->id, baby.id, 120);
+
+                    // Set 5 second reproduction cooldown (300 frames)
+                    a->reproductionCooldown = 300;
+                    b->reproductionCooldown = 300;
 
                     newBabies.push_back(std::make_unique<Creature>(std::move(baby)));
                     a->energy -= 50.f;
@@ -409,6 +479,8 @@ SimStats Simulation::getStats() const {
     s.totalFights = m_totalFights;
     s.hazardCount = (int)m_hazards.size();
     s.generation  = m_generation;
+    s.simSpeedMult = m_simSpeedMult;
+    s.foodDropMult = m_foodDropMult;
 
     if (!m_population.empty()) {
         for (const auto& c : m_population) {

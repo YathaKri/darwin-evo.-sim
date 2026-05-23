@@ -28,6 +28,10 @@ struct SimStats {
     float prevAvgSpeed  = 0.f;
     float prevAvgVision = 0.f;
     bool  hasPrevGen    = false;
+    
+    // UI Multipliers
+    int   simSpeedMult  = 1;
+    int   foodDropMult  = 1;
 };
 
 // Playback mode enum exposed so main.cpp and UI can reference it
@@ -82,12 +86,19 @@ public:
     const std::vector<GenStats>& getGenHistory()  const { return m_genHistory; }
     int  getGeneration() const { return m_generation; }
 
+    int  getSimSpeedMult() const { return m_simSpeedMult; }
+    void setSimSpeedMult(int m) { m_simSpeedMult = m; }
+    int  getFoodDropMult() const { return m_foodDropMult; }
+    void setFoodDropMult(int m) { m_foodDropMult = m; }
+
 private:
     std::mt19937 m_gen;
     float        m_mutationRate    = 0.8f;
     int          m_currentFrame    = 0;
     int          m_nextCreatureId  = 1;
     int          m_generation      = 0;
+    int          m_simSpeedMult    = 1;
+    int          m_foodDropMult    = 1;
 
     // ── Dynamic world dimensions ────────────────────────────────
     float m_worldW = 860.f;

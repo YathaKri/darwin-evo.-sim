@@ -254,6 +254,64 @@ void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
             ly += 12;
         }
 
+        // Flee status
+        if (selected->fleeing) {
+            DrawText("FLEEING HAZARD!", lx, ly, 9, Color{255, 80, 80, 255});
+            ly += 12;
+        }
+
+        // Immunity badges
+        if (selected->toxImmune || selected->radImmune) {
+            DrawText("BADGES:", lx, ly, 7, Color{90, 90, 120, 255});
+            ly += 10;
+            if (selected->toxImmune) {
+                DrawText("\xe2\x97\x86 TOX Immune (Silver)", lx, ly, 9, Color{192, 192, 210, 255});
+                ly += 12;
+            }
+            if (selected->radImmune) {
+                DrawText("\xe2\x98\x85 RAD Immune (Gold)", lx, ly, 9, Color{255, 215, 0, 255});
+                ly += 12;
+            }
+        }
+
+        // Mutation stack display
+        if (selected->mutations.hasMutations()) {
+            DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
+            ly += 4;
+            DrawText("MUTATIONS", lx, ly, 8, Color{90, 90, 120, 255});
+            ly += 10;
+
+            if (selected->mutations.speedCount > 0) {
+                std::snprintf(buf, sizeof(buf), "Speed x%d (+%.0f%%)",
+                         selected->mutations.speedCount, selected->mutations.speedBonus);
+                DrawText(buf, lx, ly, 8, Color{100, 200, 255, 255});
+                ly += 10;
+            }
+            if (selected->mutations.visionCount > 0) {
+                std::snprintf(buf, sizeof(buf), "Vision x%d (+%.0f%%)",
+                         selected->mutations.visionCount, selected->mutations.visionBonus);
+                DrawText(buf, lx, ly, 8, Color{255, 220, 100, 255});
+                ly += 10;
+            }
+            if (selected->mutations.staminaCount > 0) {
+                std::snprintf(buf, sizeof(buf), "Stamina x%d (-%d%% cost)",
+                         selected->mutations.staminaCount, selected->mutations.staminaCount * 5);
+                DrawText(buf, lx, ly, 8, Color{255, 255, 80, 255});
+                ly += 10;
+            }
+            if (selected->mutations.sizeCount > 0) {
+                std::snprintf(buf, sizeof(buf), "Size x%d (+%d%% body)",
+                         selected->mutations.sizeCount, selected->mutations.sizeCount * 10);
+                DrawText(buf, lx, ly, 8, Color{200, 120, 255, 255});
+                ly += 10;
+            }
+            if (selected->mutations.hasBio) {
+                std::snprintf(buf, sizeof(buf), "Biolum. x%d", selected->mutations.bioCount);
+                DrawText(buf, lx, ly, 8, selected->mutations.neonColor);
+                ly += 10;
+            }
+        }
+
         ly += 2;
     } else {
         DrawText("INSPECT", lx, ly, 8, Color{90, 90, 120, 255});
@@ -263,6 +321,37 @@ void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
         DrawText("Right-click to deselect", lx, ly, 7, Color{50, 50, 75, 255});
         ly += 12;
     }
+
+    // ── Controls ────────────────────────────────────────────────
+    ly = screenH - 130;
+    DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
+    ly += 6;
+
+    // Sim Speed
+    DrawText("SIM SPEED", lx, ly, 8, Color{90, 90, 120, 255});
+    ly += 12;
+    int btns[] = {1, 5, 10, 15, 20};
+    for (int i = 0; i < 5; i++) {
+        int bx = lx + i * 28;
+        Color bCol = (stats.simSpeedMult == btns[i]) ? Color{100, 200, 255, 255} : Color{50, 50, 70, 255};
+        DrawRectangle(bx, ly, 24, 14, bCol);
+        std::snprintf(buf, sizeof(buf), "%dx", btns[i]);
+        DrawText(buf, bx + 2, ly + 2, 8, (stats.simSpeedMult == btns[i]) ? Color{0, 0, 0, 255} : Color{200, 200, 200, 255});
+    }
+    ly += 20;
+
+    // Food Drop Rate
+    DrawText("FOOD DROP RATE", lx, ly, 8, Color{90, 90, 120, 255});
+    ly += 12;
+    int fBtns[] = {1, 2, 5, 10, 20};
+    for (int i = 0; i < 5; i++) {
+        int bx = lx + i * 28;
+        Color bCol = (stats.foodDropMult == fBtns[i]) ? Color{80, 255, 120, 255} : Color{50, 50, 70, 255};
+        DrawRectangle(bx, ly, 24, 14, bCol);
+        std::snprintf(buf, sizeof(buf), "%dx", fBtns[i]);
+        DrawText(buf, bx + 2, ly + 2, 8, (stats.foodDropMult == fBtns[i]) ? Color{0, 0, 0, 255} : Color{200, 200, 200, 255});
+    }
+    ly += 20;
 
     // ── Keybindings ─────────────────────────────────────────────
     DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
