@@ -313,8 +313,9 @@ void Simulation::update() {
                     c->bigFoodTimer = 300; // 5 seconds of 100% full food buff
                     c->energy = 200.f;     // instantly fill up to max
                 } else {
-                    // (c) Stamina mutation: +5% extra energy gain per stack
+                    // (c) Stamina mutation: +5% extra energy gain per stack (max 50%)
                     float gainMult = 1.f + (c->mutations.staminaCount * 0.05f);
+                    if (gainMult > 1.5f) gainMult = 1.5f;
                     c->energy += 40.f * gainMult;
                 }
                 it = m_food.erase(it);

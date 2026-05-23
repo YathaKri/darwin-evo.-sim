@@ -128,7 +128,7 @@ void Creature::update(float worldW, float worldH, const std::vector<Food>& food,
 
     // (c) Stamina mutation: each stack reduces consumption by 5%
     float staminaReduction = 1.f - (mutations.staminaCount * 0.05f);
-    if (staminaReduction < 0.1f) staminaReduction = 0.1f;  // minimum 10% cost
+    if (staminaReduction < 0.5f) staminaReduction = 0.5f;  // minimum 50% cost (cap drain reduction to 50%)
 
     // (d) Size mutation: more size stacks = faster drain
     float sizeDrainPenalty = 1.f + (mutations.sizeCount * 0.08f);

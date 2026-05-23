@@ -29,6 +29,12 @@ int main() {
         statusTimer = 180; // 3 seconds at 60fps
     };
 
+    Camera2D camera = { 0 };
+    camera.target = (Vector2){ 0.0f, 0.0f };
+    camera.offset = (Vector2){ 0.0f, 0.0f };
+    camera.rotation = 0.0f;
+    camera.zoom = 1.0f;
+
     while (!WindowShouldClose()) {
         // ── Window Resizing & Fullscreen ────────────────────────────
         
@@ -79,6 +85,26 @@ int main() {
         if (IsKeyPressed(KEY_G)) {
             sim.generateReport("simulation_report.txt");
             showStatus("Generated simulation_report.txt");
+        }
+
+        // ── Camera Panning & Zooming ────────────────────────────────
+        if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) || IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+            Vector2 delta = GetMouseDelta();
+            delta.x = delta.x * -1.0f / camera.zoom;
+            delta.y = delta.y * -1.0f / camera.zoom;
+            camera.target.x += delta.x;
+            camera.target.y += delta.y;
+        }
+
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0) {
+            Vector2 mouseWorldPos = GetScreenToWorld2D(GetMousePosition(), camera);
+            camera.offset = GetMousePosition();
+            camera.target = mouseWorldPos;
+            const float zoomIncrement = 0.125f;
+            camera.zoom += (wheel * zoomIncrement);
+            if (camera.zoom < 0.1f) camera.zoom = 0.1f;
+            if (camera.zoom > 4.0f) camera.zoom = 4.0f;
         }
 
         // ── Click-to-select organism or UI ──────────────────────────
@@ -137,13 +163,14 @@ int main() {
             } 
             else {
                 // Click in simulation canvas
+                Vector2 worldMouse = GetScreenToWorld2D(mouse, camera);
                 selectedCreatureId = -1;
                 selectedCreature = nullptr;
                 float closestDist = 9999.f;
 
                 for (const auto& c : sim.getCreatures()) {
-                    float dx = mouse.x - c->position.x;
-                    float dy = mouse.y - c->position.y;
+                    float dx = worldMouse.x - c->position.x;
+                    float dy = worldMouse.y - c->position.y;
                     float dist = std::sqrt(dx * dx + dy * dy);
                     float clickRadius = c->radius + 6.f;
                     if (dist < clickRadius && dist < closestDist) {
@@ -200,6 +227,17 @@ int main() {
         BeginDrawing();
         ClearBackground(Color{15, 15, 20, 255}); // Dark slate background
 
+        BeginMode2D(camera);
+
+        // Draw grid
+        int gw = (int)sim.getWorldW();
+        int gh = (int)sim.getWorldH();
+        for (int i = 0; i < gw; i += 50) DrawLine(i, 0, i, gh, Color{25, 25, 30, 255});
+        for (int j = 0; j < gh; j += 50) DrawLine(0, j, gw, j, Color{25, 25, 30, 255});
+        
+        // Draw world bounds
+        DrawRectangleLines(0, 0, gw, gh, Color{60, 60, 80, 255});
+
         // Draw entities (Simulation handles polymorphism Creature vs Hazard)
         sim.draw();
 
@@ -218,6 +256,8 @@ int main() {
             int textW = MeasureText(label, 10);
             DrawText(label, (int)pos.x - textW / 2, (int)pos.y - (int)r - 16, 10, {0, 255, 120, 200});
         }
+
+        EndMode2D();
 
         // Draw UI overlay panel (dynamically positioned based on window size)
         ui.draw(sim.getStats(), mode, sim.historySize(),
