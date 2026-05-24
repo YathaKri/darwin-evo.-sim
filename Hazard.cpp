@@ -68,8 +68,8 @@ void Hazard::draw() const {
 }
 
 Hazard Hazard::spawn(std::mt19937& gen, float worldW, float worldH) {
-    std::uniform_real_distribution<float> posX(80.f, worldW - 80.f);
-    std::uniform_real_distribution<float> posY(80.f, worldH - 80.f);
+    std::uniform_real_distribution<float> posX(80.f, std::max(81.f, worldW - 80.f));
+    std::uniform_real_distribution<float> posY(80.f, std::max(81.f, worldH - 80.f));
     std::uniform_real_distribution<float> radDist(40.f, 80.f);
     std::uniform_int_distribution<int>    typeDist(0, 2);
     std::uniform_int_distribution<int>    lifeDist(300, 600);

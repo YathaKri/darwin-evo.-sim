@@ -24,11 +24,16 @@ struct SimStats {
     float avgVision   = 0.f;
     int   generation  = 0;
     int   hazardCount = 0;
-    // Generation comparison
+    // Generation comparison (vs previous generation)
     float prevAvgSize   = 0.f;
     float prevAvgSpeed  = 0.f;
     float prevAvgVision = 0.f;
     bool  hasPrevGen    = false;
+    // Generation 1 baseline comparison
+    float gen1AvgSize   = 0.f;
+    float gen1AvgSpeed  = 0.f;
+    float gen1AvgVision = 0.f;
+    bool  hasGen1       = false;
     
     // UI Multipliers
     int   simSpeedMult  = 1;
@@ -140,6 +145,9 @@ private:
     std::vector<GenStats> m_genHistory;
     void recordGeneration();
 
+    GenStats m_gen1Stats;
+    bool     m_hasGen1Stats = false;
+
     // ── Rewind state-history system ─────────────────────────────
     struct Snapshot {
         std::vector<Creature> population;
@@ -151,6 +159,9 @@ private:
         int                   currentFrame;
         int                   nextCreatureId;
         int                   generation;
+        // Additional state for complete rewind
+        std::vector<Disaster> disasters;
+        std::vector<std::pair<long long, int>> collisionCooldowns;
     };
 
     static constexpr int MAX_HISTORY = 600;
