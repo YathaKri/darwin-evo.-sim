@@ -1,0 +1,10 @@
+# Build outputs
+*.exe
+darwin_sim
+
+# VS Code specific (Optional, usually good to ignore unless sharing configs)
+# /.vscode/
+
+# Game save data
+genomes_saved.txt
+simulation_report.txt

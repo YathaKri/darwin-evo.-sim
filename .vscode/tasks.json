@@ -1,0 +1,39 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "Build Darwin Simulator",
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": ["$gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "windows": {
+                "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
+                "args": [
+                    "-g",
+                    "main.cpp", "Simulation.cpp", "Creature.cpp", "Food.cpp", 
+                    "UI.cpp", "Hazard.cpp", "Disaster.cpp", "Genome.cpp",
+                    "-o", "${fileDirname}\\darwin_sim.exe",
+                    "-I", "C:\\msys64\\ucrt64\\include",
+                    "-L", "C:\\msys64\\ucrt64\\lib",
+                    "-lraylib", "-lopengl32", "-lgdi32", "-lwinmm"
+                ]
+            },
+            "linux": {
+                "command": "/usr/bin/g++",
+                "args": [
+                    "-g",
+                    "main.cpp", "Simulation.cpp", "Creature.cpp", "Food.cpp", 
+                    "UI.cpp", "Hazard.cpp", "Disaster.cpp", "Genome.cpp",
+                    "-o", "${fileDirname}/darwin_sim",
+                    "-lraylib", "-lGL", "-lm", "-lpthread", "-ldl", "-lrt", "-lX11"
+                ]
+            }
+        }
+    ]
+}
