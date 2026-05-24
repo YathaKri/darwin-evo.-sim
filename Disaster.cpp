@@ -34,8 +34,8 @@ Disaster Disaster::createVolcano(std::mt19937& gen, float worldW, float worldH) 
     d.state = DisasterState::Pending;
     d.timer = 300; // 5 second countdown
 
-    std::uniform_real_distribution<float> posX(100.f, worldW - 100.f);
-    std::uniform_real_distribution<float> posY(100.f, worldH - 100.f);
+    std::uniform_real_distribution<float> posX(100.f, std::max(101.f, worldW - 100.f));
+    std::uniform_real_distribution<float> posY(100.f, std::max(101.f, worldH - 100.f));
     d.position = {posX(gen), posY(gen)};
     d.volcanoRadius    = 22.f;
     d.eruptionDuration = 420; // 7 seconds of eruption

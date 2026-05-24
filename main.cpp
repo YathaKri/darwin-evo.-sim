@@ -46,7 +46,21 @@ int main() {
     bool isTrackingCreature = false;
     const float TRACK_ZOOM_TARGET = 2.5f;
 
+    bool isExtinct = false;
+    float extinctionRuntime = 0.f;
+
     while (!WindowShouldClose()) {
+        // ── Extinction Check ────────────────────────────────────────
+        if (!isExtinct && sim.getStats().population == 0) {
+            isExtinct = true;
+            extinctionRuntime = (float)GetTime();
+            mode = PlayMode::Paused;
+        }
+
+        if (isExtinct) {
+            mode = PlayMode::Paused;
+        }
+
         // ── Window Resizing & Fullscreen ────────────────────────────
         
         if (IsKeyPressed(KEY_F11)) {
@@ -174,12 +188,12 @@ int main() {
                 // Food Drop Rate buttons: offset +18 +20 +12 = +50
                 int fY = controlsBaseY + 50;
                 if (mouse.y >= fY && mouse.y <= fY + 14) {
-                    int fBtns[] = {1, 2, 5, 10, 20};
-                    for (int i = 0; i < 5; i++) {
-                        int bx = lx + i * 28;
-                        if (mouse.x >= bx && mouse.x <= bx + 24) {
+                    int fBtns[] = {0, 1, 2, 5, 10, 20};
+                    for (int i = 0; i < 6; i++) {
+                        int bx = lx + i * 25;
+                        if (mouse.x >= bx && mouse.x <= bx + 22) {
                             sim.setFoodDropMult(fBtns[i]);
-                            showStatus("Food Drop Rate updated");
+                            showStatus(fBtns[i] == 0 ? "Food drops DISABLED!" : "Food Drop Rate updated");
                         }
                     }
                 }
@@ -268,14 +282,6 @@ int main() {
             }
         }
 
-        // Refresh the pointer each frame (creature may have died)
-        if (selectedCreatureId != -1) {
-            selectedCreature = sim.findCreature(selectedCreatureId);
-            if (!selectedCreature) {
-                selectedCreatureId = -1;  // died, deselect
-                isTrackingCreature = false;
-            }
-        }
         
         // ── Camera Tracking Update ──────────────────────────────────
         if (isTrackingCreature && selectedCreature) {
@@ -319,6 +325,15 @@ int main() {
             // Restores history state
             sim.rewindOneStep();
             ui.popLastHistory();
+        }
+
+        // Refresh the pointer each frame AFTER update (creature may have died)
+        if (selectedCreatureId != -1) {
+            selectedCreature = sim.findCreature(selectedCreatureId);
+            if (!selectedCreature) {
+                selectedCreatureId = -1;  // died, deselect
+                isTrackingCreature = false;
+            }
         }
 
         // ── Render ──────────────────────────────────────────────────
@@ -401,12 +416,40 @@ int main() {
                                    (inputMode == InputMode::PlacingNuke)   ? 2 : 0;
         dInfo.meteorTargetsPlaced = (int)meteorTargets.size();
 
+        SimStats currentStats = sim.getStats();
+
         // Draw UI overlay panel (dynamically positioned based on window size)
-        ui.draw(sim.getStats(), mode, sim.historySize(),
+        ui.draw(currentStats, mode, sim.historySize(),
                 selectedCreature,
                 statusMsg.empty() ? nullptr : statusMsg.c_str(),
                 panelX, screenH,
                 dInfo);
+
+        // ── Simulation Ended Screen ─────────────────────────────────
+        if (currentStats.population == 0) {
+            DrawRectangle(0, 0, screenW, screenH, Color{0, 0, 0, 200});
+            const char* title = "SIMULATION ENDED - EXTINCTION";
+            int tw = MeasureText(title, 40);
+            DrawText(title, screenW / 2 - tw / 2, screenH / 2 - 100, 40, Color{255, 80, 80, 255});
+            
+            char lineBuf[128];
+            int statY = screenH / 2 - 20;
+            
+            std::snprintf(lineBuf, sizeof(lineBuf), "Total Births: %d", currentStats.totalBirths);
+            DrawText(lineBuf, screenW / 2 - MeasureText(lineBuf, 20) / 2, statY, 20, Color{230, 230, 240, 255});
+            statY += 30;
+            
+            std::snprintf(lineBuf, sizeof(lineBuf), "Peak Population: %d", currentStats.peakPop);
+            DrawText(lineBuf, screenW / 2 - MeasureText(lineBuf, 20) / 2, statY, 20, Color{230, 230, 240, 255});
+            statY += 30;
+            
+            std::snprintf(lineBuf, sizeof(lineBuf), "Final Generation: %d", currentStats.generation);
+            DrawText(lineBuf, screenW / 2 - MeasureText(lineBuf, 20) / 2, statY, 20, Color{230, 230, 240, 255});
+            statY += 30;
+            
+            std::snprintf(lineBuf, sizeof(lineBuf), "Runtime: %.1f seconds", extinctionRuntime);
+            DrawText(lineBuf, screenW / 2 - MeasureText(lineBuf, 20) / 2, statY, 20, Color{230, 230, 240, 255});
+        }
 
         EndDrawing();
     }

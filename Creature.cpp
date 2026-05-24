@@ -72,6 +72,9 @@ void Creature::update(float worldW, float worldH, const std::vector<Food>& food,
                 velocity.x = (dx / d) * moveSpeed;
                 velocity.y = (dy / d) * moveSpeed;
             }
+        } else {
+            // Mate died — reset so creature can seek food or wander
+            mateTargetId = -1;
         }
     } else {
         // ── FOOD PATHFINDING: find closest food within visionRange ──

@@ -158,12 +158,12 @@ void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
     DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
     ly += 6;
 
-    drawAvgStat("AVG SIZE",   stats.avgSize,   stats.prevAvgSize,
-                stats.hasPrevGen, 14.f,  Color{120, 100, 255, 255});
-    drawAvgStat("AVG SPEED",  stats.avgSpeed,  stats.prevAvgSpeed,
-                stats.hasPrevGen, 8.f,   Color{255, 100, 150, 255});
-    drawAvgStat("AVG VISION", stats.avgVision, stats.prevAvgVision,
-                stats.hasPrevGen, 300.f, Color{255, 200, 80, 255});
+    drawAvgStat("AVG SIZE",   stats.avgSize,   stats.gen1AvgSize,
+                stats.hasGen1, 14.f,  Color{120, 100, 255, 255});
+    drawAvgStat("AVG SPEED",  stats.avgSpeed,  stats.gen1AvgSpeed,
+                stats.hasGen1, 8.f,   Color{255, 100, 150, 255});
+    drawAvgStat("AVG VISION", stats.avgVision, stats.gen1AvgVision,
+                stats.hasGen1, 300.f, Color{255, 200, 80, 255});
 
     // ── Population graph ────────────────────────────────────────
     DrawLine(lx, ly, px + pw - 12, ly, Color{40, 40, 60, 255});
@@ -392,11 +392,11 @@ void UI::draw(const SimStats& stats, PlayMode mode, int historyFrames,
     // Food Drop Rate
     DrawText("FOOD DROP RATE", lx, ly, 8, Color{90, 90, 120, 255});
     ly += 12;
-    int fBtns[] = {1, 2, 5, 10, 20};
-    for (int i = 0; i < 5; i++) {
-        int bx = lx + i * 28;
+    int fBtns[] = {0, 1, 2, 5, 10, 20};
+    for (int i = 0; i < 6; i++) {
+        int bx = lx + i * 25;
         Color bCol = (stats.foodDropMult == fBtns[i]) ? Color{80, 255, 120, 255} : Color{50, 50, 70, 255};
-        DrawRectangle(bx, ly, 24, 14, bCol);
+        DrawRectangle(bx, ly, 22, 14, bCol);
         std::snprintf(buf, sizeof(buf), "%dx", fBtns[i]);
         DrawText(buf, bx + 2, ly + 2, 8, (stats.foodDropMult == fBtns[i]) ? Color{0, 0, 0, 255} : Color{200, 200, 200, 255});
     }

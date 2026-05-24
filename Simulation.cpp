@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
+#include <set>
 
 // ── Constructor ─────────────────────────────────────────────────
 Simulation::Simulation() : m_gen(std::random_device{}()) {}
@@ -21,11 +22,12 @@ void Simulation::init(int popCount, float mutationRate, int foodCount) {
     m_hazards.clear();
     m_history.clear();
     m_genHistory.clear();
+    m_hasGen1Stats = false;
     m_collisionCooldowns.clear();
     while (!m_events.empty()) m_events.pop();
 
-    std::uniform_real_distribution<float> posX(50.f, m_worldW - 50.f);
-    std::uniform_real_distribution<float> posY(50.f, m_worldH - 50.f);
+    std::uniform_real_distribution<float> posX(50.f, std::max(51.f, m_worldW - 50.f));
+    std::uniform_real_distribution<float> posY(50.f, std::max(51.f, m_worldH - 50.f));
     std::uniform_real_distribution<float> velDist(-2.f, 2.f);
     std::uniform_int_distribution<int>    colorDist(50, 255);
     std::uniform_real_distribution<float> sizeDist(4.f, 10.f);
@@ -62,15 +64,22 @@ void Simulation::init(int popCount, float mutationRate, int foodCount) {
 //  COLLISION COOLDOWN
 // ═══════════════════════════════════════════════════════════════
 
+// Szudzik pairing: collision-free for all non-negative integers
+static long long szudzikPair(int a, int b) {
+    long long lo = std::min(a, b);
+    long long hi = std::max(a, b);
+    return hi * hi + hi + lo;
+}
+
 bool Simulation::isOnCooldown(int idA, int idB) const {
-    long long key = (long long)std::min(idA, idB) * 100000LL + std::max(idA, idB);
+    long long key = szudzikPair(idA, idB);
     for (const auto& p : m_collisionCooldowns)
         if (p.first == key && p.second > m_currentFrame) return true;
     return false;
 }
 
 void Simulation::setCooldown(int idA, int idB, int frames) {
-    long long key = (long long)std::min(idA, idB) * 100000LL + std::max(idA, idB);
+    long long key = szudzikPair(idA, idB);
     // Update existing or add new
     for (auto& p : m_collisionCooldowns) {
         if (p.first == key) { p.second = m_currentFrame + frames; return; }
@@ -104,6 +113,10 @@ void Simulation::saveSnapshot() {
     s.nextCreatureId = m_nextCreatureId;
     s.generation     = m_generation;
 
+    // Save disasters and cooldowns for complete rewind
+    s.disasters          = m_disasters;
+    s.collisionCooldowns = m_collisionCooldowns;
+
     m_history.push_back(std::move(s));
 }
 
@@ -128,6 +141,16 @@ void Simulation::rewindOneStep() {
     m_currentFrame   = snap.currentFrame;
     m_nextCreatureId = snap.nextCreatureId;
     m_generation     = snap.generation;
+
+    // Restore disasters and cooldowns
+    m_disasters          = std::move(snap.disasters);
+    m_collisionCooldowns = std::move(snap.collisionCooldowns);
+
+    // Clear and re-seed event queue based on restored frame
+    while (!m_events.empty()) m_events.pop();
+    std::uniform_int_distribution<int> hazardDelay(400, 800);
+    m_events.push({m_currentFrame + hazardDelay(m_gen), SimEvent::SpawnHazard});
+    m_events.push({m_currentFrame + 300,                SimEvent::GenerationTick});
 
     m_history.pop_back();
 }
@@ -164,6 +187,11 @@ void Simulation::recordGeneration() {
     gs.avgVision  = s.avgVision;
     gs.population = s.population;
     m_genHistory.push_back(gs);
+
+    if (!m_hasGen1Stats) {
+        m_gen1Stats = gs;
+        m_hasGen1Stats = true;
+    }
 
     if ((int)m_genHistory.size() > 50)
         m_genHistory.erase(m_genHistory.begin());
@@ -254,6 +282,7 @@ void Simulation::update() {
     // ── Per-creature update ─────────────────────────────────────
     std::vector<std::unique_ptr<Creature>> newBabies;
     std::vector<int> deadIds;   // creatures killed in fights
+    std::set<int> eatenFood;    // food indices eaten this frame (deferred removal)
 
     for (auto& c : m_population) {
         c->update(m_worldW, m_worldH, m_food, m_population, m_hazards, m_gen);
@@ -318,13 +347,13 @@ void Simulation::update() {
             c->fleeing = false;
         }
 
-        // ── Eat food ────────────────────────────────────────────
-        for (auto it = m_food.begin(); it != m_food.end(); ) {
-            float dx   = c->position.x - it->position.x;
-            float dy   = c->position.y - it->position.y;
+        // ── Eat food (collect indices, erase after loop) ────────
+        for (int fi = 0; fi < (int)m_food.size(); ++fi) {
+            float dx   = c->position.x - m_food[fi].position.x;
+            float dy   = c->position.y - m_food[fi].position.y;
             float dist = std::sqrt(dx * dx + dy * dy);
-            if (dist < c->radius + it->radius) {
-                if (it->isBig) {
+            if (dist < c->radius + m_food[fi].radius) {
+                if (m_food[fi].isBig) {
                     c->bigFoodTimer = 300; // 5 seconds of 100% full food buff
                     c->energy = 200.f;     // instantly fill up to max
                 } else {
@@ -333,9 +362,7 @@ void Simulation::update() {
                     if (gainMult > 1.5f) gainMult = 1.5f;
                     c->energy += 40.f * gainMult;
                 }
-                it = m_food.erase(it);
-            } else {
-                ++it;
+                eatenFood.insert(fi);
             }
         }
     }
@@ -451,6 +478,13 @@ void Simulation::update() {
     for (auto& baby : newBabies)
         m_population.push_back(std::move(baby));
 
+    // ── Deferred food removal (erase from back to preserve indices) ──
+    for (auto it = eatenFood.rbegin(); it != eatenFood.rend(); ++it) {
+        if (*it < (int)m_food.size()) {
+            m_food.erase(m_food.begin() + *it);
+        }
+    }
+
     // ── Update & cull hazards ───────────────────────────────────
     for (auto& h : m_hazards)
         h->update();
@@ -537,6 +571,13 @@ SimStats Simulation::getStats() const {
         s.prevAvgVision = prev.avgVision;
     }
 
+    if (m_hasGen1Stats) {
+        s.hasGen1       = true;
+        s.gen1AvgSize   = m_gen1Stats.avgSize;
+        s.gen1AvgSpeed  = m_gen1Stats.avgSpeed;
+        s.gen1AvgVision = m_gen1Stats.avgVision;
+    }
+
     return s;
 }
 
@@ -563,8 +604,8 @@ void Simulation::loadGenomes(const std::string& filename) {
     file >> count;
 
     m_population.clear();
-    std::uniform_real_distribution<float> posX(50.f, m_worldW - 50.f);
-    std::uniform_real_distribution<float> posY(50.f, m_worldH - 50.f);
+    std::uniform_real_distribution<float> posX(50.f, std::max(51.f, m_worldW - 50.f));
+    std::uniform_real_distribution<float> posY(50.f, std::max(51.f, m_worldH - 50.f));
 
     for (int i = 0; i < count && file.good(); i++) {
         Genome gn  = Genome::load(file);
