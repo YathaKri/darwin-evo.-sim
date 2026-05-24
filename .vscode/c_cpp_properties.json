@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "GCC",
+            "name": "Windows",
             "includePath": [
                 "${workspaceFolder}/**",
                 "C:/msys64/ucrt64/include",
@@ -16,6 +16,19 @@
             "forcedInclude": [
                 "C:/msys64/ucrt64/include/raylib.h"
             ]
+        },
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/include",
+                "/usr/local/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4
