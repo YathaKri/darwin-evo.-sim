@@ -5,6 +5,10 @@
 #include <vector>
 #include <string>
 
+extern Font g_mainFont;
+void DrawTextCustom(const char *text, int posX, int posY, int fontSize, Color color);
+int MeasureTextCustom(const char *text, int fontSize);
+
 // ── Info passed from main.cpp for disaster UI rendering ─────────
 struct DisasterUIInfo {
     int cooldownFrames    = 0;   // frames remaining (0 = ready)
@@ -15,18 +19,18 @@ struct DisasterUIInfo {
 
 class UI {
 public:
-    static constexpr int   PANEL_W  = 180;
+    static constexpr int RIGHT_PANEL_W  = 260; // Increased width for larger fonts
+    static constexpr int BOTTOM_PANEL_H = 180;
 
     UI();
 
     void update(const SimStats& stats);
     void popLastHistory();
 
-    // panelX is now dynamic based on window width
     void draw(const SimStats& stats, PlayMode mode, int historyFrames,
               const Creature* selected,
               const char* statusMsg,
-              int panelX, int screenH,
+              int screenW, int screenH,
               const DisasterUIInfo& disasterInfo) const;
 
 private:

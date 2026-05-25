@@ -1,4 +1,5 @@
 #include "Hazard.h"
+#include "UI.h"
 #include <cmath>
 #include <algorithm>
 
@@ -55,15 +56,15 @@ void Hazard::draw() const {
     // Label with type info
     const char* label = (m_type == HazardType::Radiation) ? "RAD" :
                         (m_type == HazardType::Toxic) ? "TOX" : "FAM";
-    int textW = MeasureText(label, 10);
-    DrawText(label, (int)m_position.x - textW / 2, (int)m_position.y - 5, 10,
+    int textW = MeasureTextCustom(label, 10);
+    DrawTextCustom(label, (int)m_position.x - textW / 2, (int)m_position.y - 5, 10,
              {baseColor.r, baseColor.g, baseColor.b, 120});
 
     // Sub-label for effect
     const char* effect = (m_type == HazardType::Radiation) ? "HP DMG" :
                          (m_type == HazardType::Toxic) ? "POISON" : "FAMINE";
-    int effectW = MeasureText(effect, 7);
-    DrawText(effect, (int)m_position.x - effectW / 2, (int)m_position.y + 6, 7,
+    int effectW = MeasureTextCustom(effect, 7);
+    DrawTextCustom(effect, (int)m_position.x - effectW / 2, (int)m_position.y + 6, 7,
              {baseColor.r, baseColor.g, baseColor.b, 70});
 }
 

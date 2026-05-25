@@ -1,4 +1,5 @@
 #include "Disaster.h"
+#include "UI.h"
 #include "Creature.h"
 #include <cmath>
 #include <algorithm>
@@ -319,15 +320,15 @@ void Disaster::draw() const {
                 int secs = timer / 60 + 1;
                 char buf[16];
                 std::snprintf(buf, sizeof(buf), "%d", secs);
-                int tw = MeasureText(buf, 16);
-                DrawText(buf, (int)p.x - tw / 2, (int)p.y - (int)vr * 2 - 10, 16,
+                int tw = MeasureTextCustom(buf, 16);
+                DrawTextCustom(buf, (int)p.x - tw / 2, (int)p.y - (int)vr * 2 - 10, 16,
                          {255, 200, 50, 255});
 
                 // Warning text
                 const char* warn = "RUMBLING...";
-                int ww = MeasureText(warn, 8);
+                int ww = MeasureTextCustom(warn, 8);
                 float pulse = 0.5f + 0.5f * std::sin((float)age * 0.15f);
-                DrawText(warn, (int)p.x - ww / 2, (int)p.y + (int)vr + 8, 8,
+                DrawTextCustom(warn, (int)p.x - ww / 2, (int)p.y + (int)vr + 8, 8,
                          {255, 150, 50, (unsigned char)(150 + 80 * pulse)});
 
                 // Smoke wisps
@@ -358,8 +359,8 @@ void Disaster::draw() const {
 
                 // Label
                 const char* label = "ERUPTING!";
-                int lw = MeasureText(label, 9);
-                DrawText(label, (int)p.x - lw / 2, (int)p.y + (int)vr + 8, 9,
+                int lw = MeasureTextCustom(label, 9);
+                DrawTextCustom(label, (int)p.x - lw / 2, (int)p.y + (int)vr + 8, 9,
                          {255, 80, 30, (unsigned char)(180 + 60 * pulse)});
 
                 // Draw lava puddles
@@ -405,14 +406,14 @@ void Disaster::draw() const {
                 int secs = timer / 60 + 1;
                 char buf[16];
                 std::snprintf(buf, sizeof(buf), "%d", secs);
-                int tw = MeasureText(buf, 24);
-                DrawText(buf, (int)position.x - tw / 2, (int)position.y - 12, 24,
+                int tw = MeasureTextCustom(buf, 24);
+                DrawTextCustom(buf, (int)position.x - tw / 2, (int)position.y - 12, 24,
                          {255, 255, 100, 255});
 
                 // Warning text
                 const char* warn = "NUCLEAR STRIKE";
-                int ww = MeasureText(warn, 10);
-                DrawText(warn, (int)position.x - ww / 2, (int)position.y + 18, 10,
+                int ww = MeasureTextCustom(warn, 10);
+                DrawTextCustom(warn, (int)position.x - ww / 2, (int)position.y + 18, 10,
                          {255, 200, 50, (unsigned char)(160 + 60 * pulse)});
 
                 // Radiation symbol at center (3 segments)
