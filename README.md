@@ -3,15 +3,83 @@
 > A real-time **Darwinian natural selection** simulator built with **C++** and **Raylib**.  
 > Watch a population of creatures compete for food, reproduce with genetic mutations, survive environmental hazards, and evolve emergent survival strategies — all rendered with glowing, particle-like visuals on a dark canvas.
 
+Built for the **5C² Hackathon** by Yatharth, Tanay, and Yashverm.
+
 ---
 
 ## 📸 Overview
 
-Darwin drops 80 creatures into a bounded world with limited food. Every creature carries a **Genome** — a heritable blueprint encoding body size, speed, vision range, color, and shape. Creatures that eat efficiently live longer, reproduce more, and pass their genes forward. Creatures that starve die. Over generations, natural selection drives the population toward whatever traits best exploit the current environment.
+Darwin drops 80 creatures into a bounded world with limited food. Every creature carries a **Genome** — a heritable blueprint encoding body size, speed, vision range, color, and shape. Creatures that eat efficiently live longer, reproduce more, and pass their genes forward. Creatures that starve, die. Over generations, natural selection drives the population toward whatever traits best exploit the current environment.
 
 You can watch passively, or intervene: call in meteor strikes, trigger volcanic eruptions, or detonate a nuke. After a disaster, survivors carry **immunity badges** that protect their lineage from the same hazard.
 
 No strategy is hardcoded. Everything that emerges — the average size shrinking, speed settling into a band, vision sweeping upward — is a product of the rules interacting.
+
+---
+
+## 🏗️ Project Structure
+
+```
+darwin-evo-sim/
+├── main.cpp            # Window, camera, input, game loop, disaster placement
+├── Simulation.h/cpp    # Core sim: spawning, physics, eating, reproduction, events, rewind
+├── Creature.h/cpp      # Creature AI, movement, rendering, mutation inheritance
+├── Genome.h/cpp        # Heritable blueprint, fitness, mutation, file I/O
+├── Food.h/cpp          # Food struct, big food, rendering
+├── Hazard.h/cpp        # Environmental hazard zones (RAD / TOX / FAM)
+├── Disaster.h/cpp      # Player disasters (Meteor / Volcano / Nuke), factory methods
+├── Entity.h            # Abstract base class: draw(), getPosition(), getRadius()
+└── UI.h/cpp            # Stats panel, pop graph, playback indicators, inspector
+```
+
+### Architecture Overview
+
+```
+main.cpp
+  ├── Window / camera / input handling
+  ├── Disaster placement state machine (Normal → PlacingMeteor / PlacingNuke)
+  ├── Click-to-select + camera tracking
+  ├── calls Simulation::update() × SimSpeedMult  (Playing / FastForward)
+  ├── calls Simulation::rewindOneStep()           (Rewinding)
+  └── draws grid → sim.draw() → UI overlay
+
+Simulation
+  ├── owns m_population  (vector<unique_ptr<Creature>>)
+  ├── owns m_food        (vector<Food>)
+  ├── owns m_hazards     (vector<unique_ptr<Hazard>>)
+  ├── owns m_disasters   (vector<Disaster>, user-triggered)
+  ├── owns m_history     (deque<Snapshot>, max 600 frames)
+  ├── owns m_events      (priority_queue<SimEvent>, scheduled events)
+  ├── update(): snapshot → events → hazards → disasters → AI → eating
+  │             → reproduction → death → food regrowth → generation tick
+  └── rewindOneStep(): pop snapshot, restore full state
+
+Creature  (inherits Entity)
+  ├── update(): DOT → flee → mate → seek food → wander → move → energy burn
+  ├── draw(): vision ring → trail → glow → shape → energy/HP ring → mutation icons
+  └── reproduce(): crossover → mutate genome → inherit mutation stacks → new roll
+
+Hazard    (inherits Entity)
+  ├── update(): decrement lifetime
+  └── draw(): pulsing layered glow rings with type label
+
+Disaster
+  ├── Factory: createMeteor() / createVolcano() / createNuke()
+  ├── update(): state machine Pending → Active → Done
+  ├── applyDamage(): per-type damage logic against population
+  └── draw(): per-type animation (falling meteor / eruption particles / nuke flash)
+
+Genome
+  ├── fitness(): composite score (size efficiency + speed + vision)
+  ├── mutate(): per-trait independent mutation with bounded deltas
+  ├── operator< / operator== overloading
+  └── save() / load(): text-stream file I/O
+
+UI
+  ├── update(): rolling population history buffer (120 frames)
+  ├── draw(): stat blocks, bars, pop graph, playback state, inspector panel
+  └── drawGraph(): line graph rendered from m_popHistory
+```
 
 ---
 
@@ -149,72 +217,6 @@ Clicking a creature opens an **Inspector panel** showing: ID, age, HP bar, energ
 
 ---
 
-## 🏗️ Project Structure
-
-```
-darwin-evo-sim/
-├── main.cpp            # Window, camera, input, game loop, disaster placement
-├── Simulation.h/cpp    # Core sim: spawning, physics, eating, reproduction, events, rewind
-├── Creature.h/cpp      # Creature AI, movement, rendering, mutation inheritance
-├── Genome.h/cpp        # Heritable blueprint, fitness, mutation, file I/O
-├── Food.h/cpp          # Food struct, big food, rendering
-├── Hazard.h/cpp        # Environmental hazard zones (RAD / TOX / FAM)
-├── Disaster.h/cpp      # Player disasters (Meteor / Volcano / Nuke), factory methods
-├── Entity.h            # Abstract base class: draw(), getPosition(), getRadius()
-└── UI.h/cpp            # Stats panel, pop graph, playback indicators, inspector
-```
-
-### Architecture Overview
-
-```
-main.cpp
-  ├── Window / camera / input handling
-  ├── Disaster placement state machine (Normal → PlacingMeteor / PlacingNuke)
-  ├── Click-to-select + camera tracking
-  ├── calls Simulation::update() × SimSpeedMult  (Playing / FastForward)
-  ├── calls Simulation::rewindOneStep()           (Rewinding)
-  └── draws grid → sim.draw() → UI overlay
-
-Simulation
-  ├── owns m_population  (vector<unique_ptr<Creature>>)
-  ├── owns m_food        (vector<Food>)
-  ├── owns m_hazards     (vector<unique_ptr<Hazard>>)
-  ├── owns m_disasters   (vector<Disaster>, user-triggered)
-  ├── owns m_history     (deque<Snapshot>, max 600 frames)
-  ├── owns m_events      (priority_queue<SimEvent>, scheduled events)
-  ├── update(): snapshot → events → hazards → disasters → AI → eating
-  │             → reproduction → death → food regrowth → generation tick
-  └── rewindOneStep(): pop snapshot, restore full state
-
-Creature  (inherits Entity)
-  ├── update(): DOT → flee → mate → seek food → wander → move → energy burn
-  ├── draw(): vision ring → trail → glow → shape → energy/HP ring → mutation icons
-  └── reproduce(): crossover → mutate genome → inherit mutation stacks → new roll
-
-Hazard    (inherits Entity)
-  ├── update(): decrement lifetime
-  └── draw(): pulsing layered glow rings with type label
-
-Disaster
-  ├── Factory: createMeteor() / createVolcano() / createNuke()
-  ├── update(): state machine Pending → Active → Done
-  ├── applyDamage(): per-type damage logic against population
-  └── draw(): per-type animation (falling meteor / eruption particles / nuke flash)
-
-Genome
-  ├── fitness(): composite score (size efficiency + speed + vision)
-  ├── mutate(): per-trait independent mutation with bounded deltas
-  ├── operator< / operator== overloading
-  └── save() / load(): text-stream file I/O
-
-UI
-  ├── update(): rolling population history buffer (120 frames)
-  ├── draw(): stat blocks, bars, pop graph, playback state, inspector panel
-  └── drawGraph(): line graph rendered from m_popHistory
-```
-
----
-
 ## 🧪 How Evolution Emerges
 
 The simulator has no hard-coded "winning" phenotype. Everything emerges from four equations and a selection pressure:
@@ -265,6 +267,26 @@ What you typically observe:
 | Volcano eruption duration | 420 frames (7s) | `Disaster.cpp` |
 | Special mutation chance | 5% per birth | `Creature::reproduce()` |
 | Bioluminescence chance | 10% on any mutation | `Creature::reproduce()` |
+
+---
+
+## 🧱 OOP & C++ Concepts Demonstrated
+
+This project was built as a showcase of modern C++ and object-oriented design:
+
+| Concept | Where |
+|---|---|
+| **Inheritance** | `Entity` → `Creature`, `Entity` → `Hazard` |
+| **Polymorphism** | `Entity::draw()`, `getPosition()`, `getRadius()` — virtual dispatch drives all rendering |
+| **Operator overloading** | `Genome::operator<` (fitness ranking), `Genome::operator==` (genomic match) |
+| **Smart pointers** | `vector<unique_ptr<Creature>>`, `vector<unique_ptr<Hazard>>` |
+| **STL containers** | `vector`, `deque`, `priority_queue`, `queue` |
+| **`std::random`** | `mt19937` engine + typed distributions throughout |
+| **File I/O** | `Genome::save()` / `Genome::load()` via `ofstream` / `ifstream` |
+| **Event system** | `priority_queue<SimEvent>` — scheduled game events sorted by trigger frame |
+| **Template / lambda** | Lambdas for `showStatus`, `remove_if` cleanup, comparators |
+| **Factory pattern** | `Disaster::createMeteor()`, `createVolcano()`, `createNuke()` |
+| **State machine** | `DisasterState::Pending → Active → Done` per disaster instance |
 
 ---
 
@@ -422,31 +444,15 @@ Then run:
 
 ---
 
-## 🧱 OOP & C++ Concepts Demonstrated
-
-This project was built as a showcase of modern C++ and object-oriented design:
-
-| Concept | Where |
-|---|---|
-| **Inheritance** | `Entity` → `Creature`, `Entity` → `Hazard` |
-| **Polymorphism** | `Entity::draw()`, `getPosition()`, `getRadius()` — virtual dispatch drives all rendering |
-| **Operator overloading** | `Genome::operator<` (fitness ranking), `Genome::operator==` (genomic match) |
-| **Smart pointers** | `vector<unique_ptr<Creature>>`, `vector<unique_ptr<Hazard>>` |
-| **STL containers** | `vector`, `deque`, `priority_queue`, `queue` |
-| **`std::random`** | `mt19937` engine + typed distributions throughout |
-| **File I/O** | `Genome::save()` / `Genome::load()` via `ofstream` / `ifstream` |
-| **Event system** | `priority_queue<SimEvent>` — scheduled game events sorted by trigger frame |
-| **Template / lambda** | Lambdas for `showStatus`, `remove_if` cleanup, comparators |
-| **Factory pattern** | `Disaster::createMeteor()`, `createVolcano()`, `createNuke()` |
-| **State machine** | `DisasterState::Pending → Active → Done` per disaster instance |
-
----
-
 ## 👥 Contributors
- 
-- **Yatharth**
-- **Tanay**
-- **Yashverm**
+
+| Name | Role |
+|---|---|
+| **Yatharth** | Lead Developer |
+| **Tanay** | Developer |
+| **Yashverm** | Developer |
+
+Built for the **5C² Hackathon**.
 
 ---
 
